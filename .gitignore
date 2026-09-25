@@ -1,0 +1,20 @@
+# Môi trường Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Cấu hình riêng và khóa bí mật
+.env
+.env.*
+!.env.example
+
+# File phát sinh
+*.log
+*.zip
+
+# File SQL Server
+*.bak
+*.mdf
+*.ldf
