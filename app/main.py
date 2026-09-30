@@ -1,53 +1,40 @@
-from fastapi import FastAPI, HTTPException
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from app.routes import router
-from app.database import engine
-from app.internal_routes import router as internal_router
 from pathlib import Path
+
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.otp import router as otp_router
+from app.api.tuition import router as tuition_router
+from app.core.config import settings
+from app.db.database import Base, engine
+from app.models import OTP, Student, Tuition  # noqa: F401
+
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Account Service",
-    description="Dịch vụ quản lý tài khoản iBanking",
-    version="0.1.0",
+    title=settings.app_name,
+    version="1.0.0",
+    description="TV2 - Tra cuu hoc phi va OTP cho phan he thanh toan hoc phi iBanking.",
 )
 
-app.include_router(router)
-app.include_router(internal_router)
+app.include_router(tuition_router)
+app.include_router(otp_router)
 
-@app.get("/health")
-def health():
+static_dir = Path(__file__).resolve().parent.parent / "static"
+app.mount("/demo", StaticFiles(directory=static_dir, html=True), name="demo")
+
+
+@app.get("/")
+def root():
     return {
-        "service": "account-service",
-        "status": "ok",
+        "service": "TV2 - Tuition & OTP Service",
+        "status": "running",
+        "docs": "/docs",
+        "demo": "/demo/index.html",
     }
 
 
-@app.get("/health/db")
-def database_health():
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-
-        return {
-            "database": "account_db",
-            "status": "connected",
-        }
-
-    except SQLAlchemyError:
-        raise HTTPException(
-            status_code=503,
-            detail="Không kết nối được SQL Server",
-        ) from None
-
-FRONTEND_DIR = (
-    Path(__file__).resolve().parent.parent / "Front-end"
-)
-
-app.mount(
-    "/ui",
-    StaticFiles(directory=str(FRONTEND_DIR), html=True),
-    name="ui",
-)
+@app.get("/health")
+def health():
+    return {"status": "UP"}

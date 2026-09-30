@@ -1,158 +1,144 @@
-# Account Service
+# TV2 - Tuition & OTP Microservice
 
-Dịch vụ quản lý người dùng, tài khoản ngân hàng và biến động số dư
-trong hệ thống thanh toán học phí iBanking.
+Phần hiện thực của thành viên TV2 trong đề tài:
 
-## Công nghệ
+> Phân hệ đóng học phí của ứng dụng iBanking
 
-- Python, FastAPI
-- SQLAlchemy, SQL Server
-- Microsoft ODBC Driver 18, pyodbc
-- JWT và Argon2
-- HTML, CSS, JavaScript
+## 1. Chức năng
 
-## Chuẩn bị
+TV2 phụ trách:
 
-1. Cài Python và Microsoft ODBC Driver 18 for SQL Server.
-2. Tạo database account_db trong SQL Server.
-3. Tạo môi trường ảo và cài thư viện:
+- UC04 - Xem thông tin học phí.
+- UC05 - Chọn khoản học phí (phía dữ liệu/UI hỗ trợ; không cần API riêng).
+- UC07 - Gửi OTP.
+- UC08 - Xác thực OTP.
+- UC10 - Cập nhật trạng thái học phí.
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+## 2. Công nghệ
+
+- Python 3.12
+- FastAPI
+- SQLAlchemy
+- SQLite cho demo
+- SMTP cho email thật
+- Docker
+
+## 3. Chạy local
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-4. Copy .env.example thành .env.
-5. Điền tên SQL Server.
-6. Tạo JWT_SECRET_KEY ngẫu nhiên.
-7. Cấu hình INTERNAL_API_KEY thống nhất với Payment Service.
+Tạo `.env`:
 
-Kết nối SQL Server hiện sử dụng Windows Authentication.
-Tài khoản Windows chạy chương trình phải có quyền truy cập database.
-
-## Tạo dữ liệu mẫu
-
-```powershell
-.\.venv\Scripts\python.exe -m app.init_db
+```bash
+copy .env.example .env
 ```
 
-Tài khoản demo:
-- Username: huy
-- Password: HuyDemo_123!
+Tạo dữ liệu mẫu:
 
-## Chạy service
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8001
+```bash
+python seed.py
 ```
 
-- Giao diện: http://127.0.0.1:8001/ui/
-- Swagger: http://127.0.0.1:8001/docs
-- OpenAPI: http://127.0.0.1:8001/openapi.json
-- Kiểm tra DB: http://127.0.0.1:8001/health/db
+Chạy:
 
-## API người dùng
-
-| Method | Endpoint | Xác thực |
-|---|---|---|
-| POST | /auth/login | Không |
-| GET | /users/me | Bearer token |
-| GET | /accounts/me | Bearer token |
-
-POST /auth/login nhận JSON:
-
-```json
-{
-  "username": "huy",
-  "password": "HuyDemo_123!"
-}
+```bash
+uvicorn app.main:app --reload --port 8002
 ```
 
-Các API được bảo vệ nhận header:
+Mở:
 
 ```text
-Authorization: Bearer <access_token>
+http://localhost:8002/docs
 ```
 
-## API nội bộ
-
-Tất cả API nội bộ yêu cầu header:
+Demo UI:
 
 ```text
-X-Internal-Key: <khóa dùng chung với Payment Service>
+http://localhost:8002/demo/index.html
 ```
 
-| Method | Endpoint |
-|---|---|
-| POST | /internal/accounts/debit |
-| POST | /internal/accounts/refund |
-| GET | /internal/account-operations/{payment_id} |
+## 4. OTP demo
 
-Request trừ tiền:
+Nếu chưa cấu hình SMTP, hệ thống chạy DEMO mode.
+
+Sau khi gọi `/api/v1/otp/send`, OTP sẽ được in ở terminal:
+
+```text
+[DEMO EMAIL] to=an@gmail.com | transaction=TX001 | OTP=123456 | expires=300s
+```
+
+Dùng mã đó để gọi `/api/v1/otp/verify`.
+
+## 5. Docker
+
+```bash
+copy .env.example .env
+docker compose up --build
+```
+
+API:
+
+```text
+http://localhost:8002/docs
+```
+
+## 6. Test
+
+```bash
+pytest -q
+```
+
+## 7. Dữ liệu mẫu
+
+```text
+52200001 / an@gmail.com / 12,500,000
+52200002 / binh@gmail.com / 9,800,000
+52200003 / cuong@gmail.com / 15,000,000
+```
+
+## 8. Khi ghép với TV3
+
+TV3 gọi:
+
+```http
+PATCH /api/v1/internal/tuition/{mssv}/paid
+```
+
+Body:
 
 ```json
 {
-  "payment_id": "11111111-1111-4111-8111-111111111111",
-  "account_id": 1,
-  "payer_user_id": 1,
-  "amount": "2000000.00"
+  "transaction_id": "TX001"
 }
 ```
 
-Request hoàn tiền:
+TV2 chỉ chuyển:
 
-```json
-{
-  "payment_id": "11111111-1111-4111-8111-111111111111"
-}
+```text
+UNPAID -> PAID
 ```
 
-Response thành công có:
-payment_id, account_id, amount, status.
+một lần. Nếu học phí đã PAID, trả HTTP 409.
 
-Trạng thái:
-- DEBITED: khoản trừ tiền đã được ghi nhận.
-- REFUNDED: khoản trừ tiền đã được hoàn.
+## 9. Lưu ý tích hợp API Gateway
 
-## Quy tắc tích hợp
+API Gateway của nhóm có thể route:
 
-- payment_id dùng UUID.
-- Gửi lại yêu cầu phải giữ nguyên payment_id và dữ liệu.
-- Một payment_id không được dùng cho khoản thanh toán mới.
-- Giao dịch đã hoàn không được trừ lại.
-- Amount truyền bằng chuỗi thập phân.
-- Payment Service kiểm tra OTP và lấy số tiền từ Tuition Service.
-- payer_user_id phải lấy từ danh tính đã xác minh.
-- Không đưa khóa API nội bộ vào trình duyệt.
-- Timeout hoặc HTTP 503: tra cứu, thử lại có giới hạn bằng cùng mã.
-- HTTP 404 khi tra cứu chưa chứng minh một yêu cầu đang chạy
-  sẽ không hoàn tất sau đó.
-
-## Mã lỗi chính
-
-- 401: thiếu/sai thông tin xác thực.
-- 403: người dùng bị vô hiệu hóa hoặc sai chủ tài khoản.
-- 404: chưa tìm thấy tài khoản hoặc khoản trừ tiền.
-- 409: không đủ số dư, tài khoản khóa hoặc xung đột dữ liệu.
-- 422: dữ liệu đầu vào không hợp lệ.
-- 503: chưa xác định được kết quả do lỗi database.
-
-## Kiểm thử đồng thời
-
-Giữ server đang chạy, mở terminal khác:
-
-```powershell
-.\.venv\Scripts\python.exe -m checks.test_concurrency
+```text
+/api/v1/tuition/* -> TV2:8002
+/api/v1/otp/*     -> TV2:8002
 ```
 
-Chương trình tạo hai tài khoản thử riêng và kiểm tra:
-1. Trừ tiền trùng.
-2. Cùng mã nhưng khác số tiền.
-3. Hoàn tiền trùng và gửi lại giao dịch đã hoàn.
-4. Hai giao dịch cùng sử dụng một số dư không đủ cho cả hai.
+API internal:
 
-## Phạm vi hiện tại
+```text
+/api/v1/internal/tuition/*/paid -> TV2:8002
+```
 
-- Giao diện đăng nhập và xem tài khoản đã được kết nối API.
-- Đăng xuất chỉ xóa token ở trình duyệt, chưa thu hồi JWT trên server.
-- Cần kiểm thử phục hồi lỗi khi tích hợp với Payment Service.
+Nên giới hạn API internal để chỉ Payment Service của TV3 gọi được trong hệ thống thật.

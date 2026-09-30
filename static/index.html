@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iBanking - TV2 Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 850px;
+            margin: 30px auto;
+            padding: 0 20px;
+            background: #f5f7fb;
+        }
+        .card {
+            background: white;
+            padding: 22px;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08);
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            cursor: pointer;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .hidden { display: none; }
+        pre {
+            background: #111;
+            color: #eee;
+            padding: 12px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>iBanking - TV2 Tuition & OTP</h1>
+
+    <div class="card">
+        <h2>1. Tra cứu học phí</h2>
+        <input id="mssv" value="52200001" placeholder="Nhập MSSV">
+        <button onclick="lookup()">Tra cứu</button>
+        <pre id="tuitionResult">Chưa có dữ liệu.</pre>
+    </div>
+
+    <div class="card">
+        <h2>2. Gửi OTP</h2>
+        <input id="transactionId" value="TX-DEMO-001" placeholder="Transaction ID">
+        <input id="email" value="an@gmail.com" placeholder="Email">
+        <button onclick="sendOtp()">Gửi OTP</button>
+        <p id="sendMessage"></p>
+    </div>
+
+    <div class="card">
+        <h2>3. Xác thực OTP</h2>
+        <input id="otp" placeholder="Nhập OTP 6 số">
+        <button onclick="verifyOtp()">Xác thực</button>
+        <p id="verifyMessage"></p>
+    </div>
+
+    <div class="card">
+        <h2>4. Demo cập nhật đã thanh toán</h2>
+        <p>Trong hệ thống thật, TV3 gọi API này sau khi trừ tiền thành công.</p>
+        <button onclick="markPaid()">Đánh dấu PAID</button>
+        <pre id="paidResult"></pre>
+    </div>
+
+<script>
+async function lookup() {
+    const mssv = document.getElementById("mssv").value.trim();
+    const res = await fetch(`/api/v1/tuition/${encodeURIComponent(mssv)}`);
+    const data = await res.json();
+    document.getElementById("tuitionResult").textContent =
+        JSON.stringify(data, null, 2);
+}
+
+async function sendOtp() {
+    const body = {
+        transaction_id: document.getElementById("transactionId").value.trim(),
+        mssv: document.getElementById("mssv").value.trim(),
+        email: document.getElementById("email").value.trim()
+    };
+
+    const res = await fetch("/api/v1/otp/send", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    const el = document.getElementById("sendMessage");
+    el.textContent = JSON.stringify(data);
+    el.className = res.ok ? "success" : "error";
+}
+
+async function verifyOtp() {
+    const body = {
+        transaction_id: document.getElementById("transactionId").value.trim(),
+        otp: document.getElementById("otp").value.trim()
+    };
+
+    const res = await fetch("/api/v1/otp/verify", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    const el = document.getElementById("verifyMessage");
+    el.textContent = JSON.stringify(data);
+    el.className = res.ok ? "success" : "error";
+}
+
+async function markPaid() {
+    const mssv = document.getElementById("mssv").value.trim();
+    const transactionId = document.getElementById("transactionId").value.trim();
+
+    const res = await fetch(`/api/v1/internal/tuition/${encodeURIComponent(mssv)}/paid`, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({transaction_id: transactionId})
+    });
+
+    const data = await res.json();
+    document.getElementById("paidResult").textContent =
+        JSON.stringify(data, null, 2);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+services:
+  tuition-service:
+    build: .
+    container_name: tv2-tuition-service
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
