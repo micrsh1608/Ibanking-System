@@ -1,32 +1,32 @@
-
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-load_dotenv()
+ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT / ".env")
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME")
-
-DATABASE_URL = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}"
-    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+connection_string = (
+    f"DRIVER={{{os.environ['DB_DRIVER']}}};"
+    f"SERVER={os.environ['DB_SERVER']};"
+    f"DATABASE={os.getenv('PAYMENT_DB_NAME', 'payment_db')};"
+    "Trusted_Connection=yes;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=yes;"
 )
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True
+DATABASE_URL = URL.create(
+    "mssql+pyodbc",
+    query={"odbc_connect": connection_string},
 )
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(
-    autocommit=False,
+    bind=engine,
     autoflush=False,
-    bind=engine
 )
 
 Base = declarative_base()

@@ -1,8 +1,8 @@
 from app.db.database import Base, engine
 
-from app.models.payment import PaymentTransaction
-from app.models.account import Account
-from app.models.tuition import TuitionFee
+from app.payment_models.payment import PaymentTransaction
+from app.payment_models.account import Account
+from app.payment_models.tuition import TuitionFee
 
 
 def init_db():

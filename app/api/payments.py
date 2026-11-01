@@ -6,10 +6,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
 
 from app.db.database import get_db
-from app.models.payment import PaymentTransaction
-from app.models.account import Account
-from app.models.tuition import TuitionFee
-from app.schemas.payment import (
+from app.payment_models.payment import PaymentTransaction
+from app.payment_models.account import Account
+from app.payment_models.tuition import TuitionFee
+from app.payment_schemas.payment import (
     PaymentCreate,
     PaymentResponse,
     PaymentValidationRequest,
