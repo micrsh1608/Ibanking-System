@@ -1,158 +1,101 @@
-# Account Service
+# iBanking — Thanh toán học phí
 
-Dịch vụ quản lý người dùng, tài khoản ngân hàng và biến động số dư
-trong hệ thống thanh toán học phí iBanking.
+Dự án giữa kỳ dùng FastAPI, SQLAlchemy, SQL Server và HTML/CSS/JavaScript.
+Mã nguồn được tổ chức theo ba service: Account, Payment và Tuition.
 
-## Công nghệ
+**Hiện trạng:** đã hoàn thành sớm các mốc 02–08/11: thanh toán một/toàn bộ hóa đơn,
+OTP qua email, xác nhận thành công, outbox retry và giao diện lịch sử. Payment
+có JWT/ownership, tích hợp REST và phục hồi giao dịch; UI dùng gateway cùng origin.
+Docker mặc định nhận thư tại Mailpit để demo, có thể cấu hình SMTP thật.
+Đã nghiệm thu tải, mất mạng, mất phản hồi sau commit, restart Payment/SQL Server
+trên project riêng. Báo cáo PDF, slide PPTX và source ZIP nằm trong `submission/`;
+hai thành viên còn lại cần bổ sung trước khi nộp.
 
-- Python, FastAPI
-- SQLAlchemy, SQL Server
-- Microsoft ODBC Driver 18, pyodbc
-- JWT và Argon2
-- HTML, CSS, JavaScript
-
-## Chuẩn bị
-
-1. Cài Python và Microsoft ODBC Driver 18 for SQL Server.
-2. Tạo database account_db trong SQL Server.
-3. Tạo môi trường ảo và cài thư viện:
-
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-4. Copy .env.example thành .env.
-5. Điền tên SQL Server.
-6. Tạo JWT_SECRET_KEY ngẫu nhiên.
-7. Cấu hình INTERNAL_API_KEY thống nhất với Payment Service.
-
-Kết nối SQL Server hiện sử dụng Windows Authentication.
-Tài khoản Windows chạy chương trình phải có quyền truy cập database.
-
-## Tạo dữ liệu mẫu
-
-```powershell
-.\.venv\Scripts\python.exe -m app.init_db
-```
-
-Tài khoản demo:
-- Username: huy
-- Password: HuyDemo_123!
-
-## Chạy service
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8001
-```
-
-- Giao diện: http://127.0.0.1:8001/ui/
-- Swagger: http://127.0.0.1:8001/docs
-- OpenAPI: http://127.0.0.1:8001/openapi.json
-- Kiểm tra DB: http://127.0.0.1:8001/health/db
-
-## API người dùng
-
-| Method | Endpoint | Xác thực |
-|---|---|---|
-| POST | /auth/login | Không |
-| GET | /users/me | Bearer token |
-| GET | /accounts/me | Bearer token |
-
-POST /auth/login nhận JSON:
-
-```json
-{
-  "username": "huy",
-  "password": "HuyDemo_123!"
-}
-```
-
-Các API được bảo vệ nhận header:
+## Cấu trúc
 
 ```text
-Authorization: Bearer <access_token>
+services/
+  account/           # Xác thực, người dùng, số dư, bút toán
+  payment/           # Snapshot, SMTP/OTP, điều phối REST, recovery và outbox
+  tuition/           # Sinh viên, hóa đơn học phí
+shared/              # Đọc .env và tạo kết nối SQL Server; không chia sẻ model
+frontend/            # Giao diện do Account phục vụ tại /ui/
+tests/
+  unit/              # Kiểm thử tự động, SQLite và kiểm tra khởi động
+  integration/       # Kịch bản đồng thời trên SQL Server, chạy chủ động
+infra/
+  docker/            # Dockerfile và khởi tạo dữ liệu demo
+  env/               # Mẫu cấu hình Docker/Tuition
+  sql/               # Tạo ba database
+scripts/             # Lệnh hỗ trợ phát triển
+docs/                # Đánh giá, kế hoạch, thiết kế, API và vận hành
+submission/          # Báo cáo, slide, bằng chứng và bản nguồn dự phòng
+compose.yaml
+start.ps1            # Chạy toàn bộ dự án bằng một lệnh
+.env.example
+requirements.txt
+requirements-dev.txt
 ```
 
-## API nội bộ
+## Bắt đầu
 
-Tất cả API nội bộ yêu cầu header:
+Chạy toàn bộ dự án bằng **một lệnh** trong PowerShell:
 
-```text
-X-Internal-Key: <khóa dùng chung với Payment Service>
+```powershell
+.\start.ps1
 ```
 
-| Method | Endpoint |
+Lệnh tự tạo cấu hình Docker nếu thiếu, khởi động Docker Desktop nếu cần, tạo
+DB/dữ liệu demo và chạy SQL Server, ba API cùng Mailpit. Log gom vào terminal
+hiện tại; nhấn **Ctrl+C** để dừng. Cần cài Docker Desktop và dùng Linux containers.
+Không cần cài Python trên máy nếu chỉ chạy bằng Docker.
+
+Nếu PowerShell chặn script, dùng một lệnh sau (chỉ áp dụng cho tiến trình này):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+Chạy nền bằng `.\start.ps1 -Detached`; kiểm tra môi trường bằng `.\start.ps1 -Check`.
+Docker giữ dữ liệu trong volume riêng, không dùng SQL Server cài trên Windows.
+
+### Phát triển bằng Python trên Windows
+
+Lệnh chạy từ thư mục gốc bằng PowerShell. Giữ nguyên `.env` riêng nếu đã có.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Chạy trên Windows với SQL Server: xem [hướng dẫn cài đặt](docs/runbook.md#windows-và-sql-server).
+
+| Thành phần | Địa chỉ cục bộ |
 |---|---|
-| POST | /internal/accounts/debit |
-| POST | /internal/accounts/refund |
-| GET | /internal/account-operations/{payment_id} |
+| Giao diện đăng nhập/tài khoản | http://127.0.0.1:8001/ui/ |
+| Account Swagger | http://127.0.0.1:8001/docs |
+| Payment Swagger | http://127.0.0.1:8002/docs |
+| Tuition Swagger | http://127.0.0.1:8003/docs |
+| Hộp thư demo Mailpit | http://127.0.0.1:8025 |
 
-Request trừ tiền:
+Demo Account: `huy` / `HuyDemo_123!`. Demo MSSV: `SV2026001`.
+Payment lấy dữ liệu qua REST; tạo giao dịch cần header `Idempotency-Key` UUID.
+MSSV demo có hai học kỳ. Mở **Đóng học phí**, tra MSSV, chọn hóa đơn, xác nhận và
+lấy OTP trong Mailpit. Biên nhận được gửi sau thành công. **Lịch sử giao dịch**
+cho phép tra kết quả hoặc tiếp tục giao dịch đang chờ.
 
-```json
-{
-  "payment_id": "11111111-1111-4111-8111-111111111111",
-  "account_id": 1,
-  "payer_user_id": 1,
-  "amount": "2000000.00"
-}
-```
+## Tài liệu
 
-Request hoàn tiền:
-
-```json
-{
-  "payment_id": "11111111-1111-4111-8111-111111111111"
-}
-```
-
-Response thành công có:
-payment_id, account_id, amount, status.
-
-Trạng thái:
-- DEBITED: khoản trừ tiền đã được ghi nhận.
-- REFUNDED: khoản trừ tiền đã được hoàn.
-
-## Quy tắc tích hợp
-
-- payment_id dùng UUID.
-- Gửi lại yêu cầu phải giữ nguyên payment_id và dữ liệu.
-- Một payment_id không được dùng cho khoản thanh toán mới.
-- Giao dịch đã hoàn không được trừ lại.
-- Amount truyền bằng chuỗi thập phân.
-- Payment Service kiểm tra OTP và lấy số tiền từ Tuition Service.
-- payer_user_id phải lấy từ danh tính đã xác minh.
-- Không đưa khóa API nội bộ vào trình duyệt.
-- Timeout hoặc HTTP 503: tra cứu, thử lại có giới hạn bằng cùng mã.
-- HTTP 404 khi tra cứu chưa chứng minh một yêu cầu đang chạy
-  sẽ không hoàn tất sau đó.
-
-## Mã lỗi chính
-
-- 401: thiếu/sai thông tin xác thực.
-- 403: người dùng bị vô hiệu hóa hoặc sai chủ tài khoản.
-- 404: chưa tìm thấy tài khoản hoặc khoản trừ tiền.
-- 409: không đủ số dư, tài khoản khóa hoặc xung đột dữ liệu.
-- 422: dữ liệu đầu vào không hợp lệ.
-- 503: chưa xác định được kết quả do lỗi database.
-
-## Kiểm thử đồng thời
-
-Giữ server đang chạy, mở terminal khác:
-
-```powershell
-.\.venv\Scripts\python.exe -m checks.test_concurrency
-```
-
-Chương trình tạo hai tài khoản thử riêng và kiểm tra:
-1. Trừ tiền trùng.
-2. Cùng mã nhưng khác số tiền.
-3. Hoàn tiền trùng và gửi lại giao dịch đã hoàn.
-4. Hai giao dịch cùng sử dụng một số dư không đủ cho cả hai.
-
-## Phạm vi hiện tại
-
-- Giao diện đăng nhập và xem tài khoản đã được kết nối API.
-- Đăng xuất chỉ xóa token ở trình duyệt, chưa thu hồi JWT trên server.
-- Cần kiểm thử phục hồi lỗi khi tích hợp với Payment Service.
+- [Đối chiếu yêu cầu và những phần còn thiếu](docs/assessment.md)
+- [Kế hoạch bảy ngày, 02–08/11/2026](docs/implementation-plan.md)
+- [Kiến trúc hiện tại, kiến trúc mục tiêu, Use Case và ERD](docs/architecture.md)
+- [API đã triển khai và hợp đồng request/response](docs/api.md)
+- [Bàn giao backend 02–04/11 và kiểm thử SQL Server](docs/backend-delivery.md)
+- [Migration và dữ liệu cũ](docs/migrations.md)
+- [Bàn giao UI/email ngày 05–06/11 và cách trình diễn](docs/ui-email-delivery.md)
+- [Cài đặt, Docker, SMTP và kiểm thử](docs/runbook.md)
+- [Nghiệm thu và bàn giao 07–08/11](docs/final-acceptance.md)
+- [Báo cáo nguồn có thể biên tập](docs/final-report.md), [kịch bản demo](docs/demo-script.md)
+- [Checklist trước khi nộp](docs/submission-checklist.md)
+- [Thay đổi đường dẫn sau khi sắp xếp](docs/reorganization.md)
+- [Account Service](docs/services/account.md), [Payment Service](docs/services/payment.md), [Tuition Service](docs/services/tuition.md)

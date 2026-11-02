@@ -1,0 +1,93 @@
+/* Tuition and history share the existing iBanking palette and typography. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.banner-action { margin-left: auto; flex-shrink: 0; min-width: 150px; }
+.payment-steps { display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; margin: 0 0 26px; padding: 0; gap: 12px; }
+.payment-steps li { display: flex; align-items: center; gap: 9px; color: #82938f; font-size: 12px; }
+.payment-steps li span { display: inline-grid; place-items: center; width: 29px; height: 29px; border: 1px solid #d8e3dc; border-radius: 50%; background: #fff; font-size: 11px; flex-shrink: 0; }
+.payment-steps li[aria-current] { color: #21664d; font-weight: 650; }
+.payment-steps li[aria-current] span { background: #226e55; border-color: #226e55; color: #fff; }
+.payment-steps li.done span { background: #e0f0e7; color: #21664d; border-color: #d3e8db; }
+.tuition-layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(250px, 1fr); gap: 23px; align-items: start; }
+.tuition-main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.tuition-layout .card { padding: 27px; }
+.tuition-layout h2, .history-card h2 { font-size: 19px; font-weight: 650; letter-spacing: -.4px; }
+.lookup-card > .muted, .payer-card > .muted { margin-top: 10px; font-size: 12px; }
+.lookup-card > .eyebrow, .payer-card > .eyebrow, .confirmation-card .eyebrow { color: #63816e; font-size: 9px; }
+.lookup-form { display: flex; align-items: flex-end; gap: 12px; margin-top: 25px; }
+.lookup-form .field { flex: 1; min-width: 0; }
+.lookup-form label, .otp-form > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.lookup-form input, .otp-form > input { width: 100%; min-height: 46px; border: 1px solid #dbe6df; background: #fcfefd; border-radius: 9px; padding: 12px 14px; color: var(--ink); }
+.lookup-form > button { min-height: 46px; margin: 0; width: auto; padding: 12px 23px; }
+.inline-notice { margin-top: 18px; padding: 13px 16px; background: #eef6f1; border: 1px solid #d8e9df; border-radius: 10px; color: #38644f; font-size: 12px; overflow-wrap: anywhere; }
+.inline-notice.error { background: #fff5ee; border-color: #efd9c8; color: #8e5731; }
+.student-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+.student-heading .muted { font-size: 11px; }
+.student-heading h3 { font-size: 18px; margin: 5px 0; overflow-wrap: anywhere; }
+.soft-badge { display: inline-block; padding: 5px 10px; border-radius: 20px; background: #eaf3ee; color: #42725a; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.soft-badge.warning { background: #fcf0de; color: #976b28; }
+.soft-badge.error { background: #f9e8e6; color: #9a4840; }
+.soft-badge.neutral { background: #edf1f3; color: #637781; }
+.selection-modes { margin: 24px 0 18px; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.selection-modes legend { font-size: 11px; color: var(--muted); padding: 0 0 11px; }
+.selection-modes label { font-size: 12px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.selection-modes input, .data-table input { accent-color: #287655; width: 16px; height: 16px; cursor: pointer; }
+.table-scroll { overflow-x: auto; width: 100%; }
+.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.data-table th { color: #778e82; font-size: 10px; font-weight: 550; padding: 12px 9px; border-bottom: 1px solid #dae6dd; background: #f7faf8; white-space: nowrap; }
+.data-table td { padding: 17px 9px; border-bottom: 1px solid #edf1ed; vertical-align: middle; }
+.data-table td:first-child, .data-table th:first-child { padding-left: 12px; }
+.data-table .number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.data-table .muted { display: block; font-size: 10px; margin-top: 5px; overflow-wrap: anywhere; }
+.selection-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0; font-size: 11px; color: var(--muted); }
+.selection-summary > div { text-align: right; }
+.selection-summary strong { display: block; font-size: 23px; line-height: 1.4; margin-top: 4px; color: var(--ink); }
+.primary.wide { width: 100%; min-height: 46px; margin-top: 18px; }
+.balance-warning { padding: 11px 13px; background: #fff5e9; color: #9b6531; border-radius: 8px; font-size: 11px; }
+.payer-card { position: sticky; top: 24px; }
+.payer-fields { margin: 21px 0 0; }
+.payer-fields > div { margin: 0; padding: 15px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.payer-fields dt { font-size: 10px; color: #7d9188; }
+.payer-fields dd { margin: 5px 0 0; font-size: 12px; font-weight: 550; overflow-wrap: anywhere; }
+.payer-fields > div:last-child dd { font-size: 21px; color: #2a7153; }
+.payer-note { font-size: 11px; line-height: 1.8; color: #688574; background: #f1f7f2; padding: 14px; border-radius: 9px; margin-top: 20px; }
+.reference-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 0; margin: 15px 0 2px; border-bottom: 1px solid var(--border); font-size: 10px; color: var(--muted); }
+.reference-row code { color: #4c6960; font-size: 10px; overflow-wrap: anywhere; max-width: 100%; }
+.small-button { min-height: 33px; border: 1px solid #dce7df; background: #f7faf8; border-radius: 7px; padding: 7px 10px; color: #3c7355; font-size: 11px; }
+.small-button:hover { background: #eaf4ed; }
+.snapshot-student { font-size: 13px; padding: 16px 0 10px; }
+.snapshot-student strong { display: block; font-size: 16px; margin-bottom: 5px; }
+.snapshot-student > span { font-size: 11px; color: var(--muted); }
+.snapshot-line { display: flex; justify-content: space-between; gap: 15px; padding: 13px 0; font-size: 12px; border-bottom: 1px solid #edf2ed; }
+.snapshot-line strong { font-weight: 550; white-space: nowrap; }
+.payment-total { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin: 20px 0 15px; font-size: 12px; }
+.payment-total strong { font-size: 25px; font-weight: 650; white-space: nowrap; }
+#confirmationHint { font-size: 11px; line-height: 1.8; }
+.otp-form { border-top: 1px solid var(--border); margin-top: 23px; padding-top: 22px; }
+.otp-form > .muted { font-size: 12px; margin-bottom: 17px; }
+.otp-form > input { max-width: 255px; font-size: 25px; letter-spacing: 10px; text-align: center; }
+.otp-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 11px; color: #7d8e85; }
+.payment-result { border-top: 3px solid #8fbaa0; }
+.result-symbol { display: grid; place-items: center; width: 49px; height: 49px; background: #e8f4eb; border-radius: 50%; color: #28734c; font-size: 26px; margin-bottom: 18px; }
+.payment-result .eyebrow { color: #5e8669; font-size: 9px; }
+.payment-result > p:not(.eyebrow) { margin-top: 12px; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.payment-result.pending { border-top-color: #d4b77d; }
+.payment-result.pending .result-symbol { background: #fcf3e1; color: #a47b39; }
+.payment-result.failed { border-top-color: #cf9c8b; }
+.payment-result.failed .result-symbol { background: #fbede7; color: #a46c52; }
+.result-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; }
+.result-actions .primary, .result-actions .secondary { width: auto; min-height: 39px; font-size: 11px; padding: 10px 14px; margin: 0; }
+#pendingIntentCard { margin: 0; }
+#pendingIntentCard h2 { font-size: 16px; }
+#pendingIntentCard p { margin: 12px 0; }
+#pendingIntentCard code { display: block; margin-bottom: 15px; overflow-wrap: anywhere; }
+.history-description { margin: 13px 0 24px; font-size: 12px; }
+.history-card .card-heading { align-items: center; }
+.history-card .secondary { width: auto; min-height: 39px; font-size: 11px; padding: 10px 13px; }
+.history-card .data-table { min-width: 650px; }
+.history-card .data-table td { padding-top: 20px; padding-bottom: 20px; }
+.history-card .data-table code { font-size: 9px; color: #6a7e76; }
+.history-more { display: block; margin: 24px auto 0; }
+.empty-state { padding: 45px 10px; text-align: center; color: var(--muted); font-size: 13px; }
+@media (max-width: 1150px) { .tuition-layout { grid-template-columns: minmax(0, 1fr) 245px; gap: 18px; } .tuition-layout .card { padding: 22px; } .payment-steps { gap: 6px; } .payment-steps li { font-size: 10px; gap: 6px; } }
+@media (max-width: 950px) { .tuition-layout { grid-template-columns: 1fr; } .payer-card { position: static; grid-row: 1; } .payer-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; margin-top: 10px; } .payer-card > .muted, .payer-note { display: none; } .payer-fields > div:last-child dd { font-size: 15px; } }
+@media (max-width: 650px) { .sidebar nav { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; padding-bottom: 8px; } .sidebar nav .nav-item { justify-content: flex-start; min-height: 39px; } .sidebar nav .nav-item .icon { width: 17px; } .banner-action { min-width: 0; margin-left: 0; width: 100%; } .tuition-banner { flex-wrap: wrap; } .tuition-banner > div { flex: 1; } .payment-steps { gap: 5px; margin-bottom: 20px; } .payment-steps li { flex-direction: column; text-align: center; font-size: 9px; gap: 6px; } .tuition-layout .card { padding: 20px 17px; } .payer-fields { grid-template-columns: 1fr 1fr; gap: 0 15px; } .payer-fields dd { font-size: 11px; } .payer-card h2 { font-size: 17px; } .payer-fields > div { padding: 12px 0; } .lookup-form { align-items: stretch; flex-direction: column; gap: 10px; } .lookup-form > button { width: 100%; } .selection-modes { flex-direction: column; } .data-table { font-size: 11px; } .data-table td { padding: 14px 6px; } .data-table th { padding: 11px 6px; } .data-table .soft-badge { font-size: 9px; padding: 4px 6px; } .selection-summary strong { font-size: 21px; } .payment-total strong { font-size: 22px; } .reference-row code { width: 100%; } .history-card .card-heading { align-items: flex-start; flex-direction: column; } }

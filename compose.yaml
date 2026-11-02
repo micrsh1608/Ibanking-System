@@ -1,0 +1,109 @@
+name: ibanking-demo
+
+x-api: &api
+  image: ibanking-api:local
+  build:
+    context: .
+    dockerfile: infra/docker/Dockerfile
+  environment: &environment
+    DB_SERVER: sqlserver,1433
+    DB_DRIVER: ODBC Driver 18 for SQL Server
+    DB_NAME: account_db
+    PAYMENT_DB_NAME: payment_db
+    TUITION_DB_NAME: tuition_db
+    DB_USER: sa
+    DB_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in infra/env/docker.env}
+    DB_TRUST_SERVER_CERTIFICATE: "yes"
+    JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in infra/env/docker.env}
+    INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in infra/env/docker.env}
+    ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+    ACCOUNT_SERVICE_URL: http://account:8001
+    TUITION_SERVICE_URL: http://tuition:8003
+    PAYMENT_SERVICE_URL: http://payment:8002
+    PAYMENT_RECOVERY_ENABLED: "true"
+    PAYMENT_MAIL_ENABLED: "true"
+    SMTP_HOST: ${SMTP_HOST:-mailpit}
+    SMTP_PORT: ${SMTP_PORT:-1025}
+    SMTP_USERNAME: ${SMTP_USERNAME:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+    SMTP_SSL: ${SMTP_SSL:-false}
+    SMTP_FROM: ${SMTP_FROM:-ibanking@example.test}
+  depends_on:
+    db-init:
+      condition: service_completed_successfully
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in infra/env/docker.env}
+    ports:
+      - "127.0.0.1:14330:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  db-init:
+    <<: *api
+    command: ["python", "-m", "infra.docker.init_databases"]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  account:
+    <<: *api
+    command: ["python", "-m", "uvicorn", "services.account.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "127.0.0.1:8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  payment:
+    <<: *api
+    command: ["python", "-m", "uvicorn", "services.payment.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "127.0.0.1:8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  tuition:
+    <<: *api
+    command: ["python", "-m", "uvicorn", "services.tuition.main:app", "--host", "0.0.0.0", "--port", "8003"]
+    ports:
+      - "127.0.0.1:8003:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - mailpit-data:/data
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  sqlserver-data:
+  mailpit-data:

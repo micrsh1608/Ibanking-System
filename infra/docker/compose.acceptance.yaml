@@ -1,0 +1,52 @@
+# Disposable acceptance project; start only through tests.integration.release_acceptance.
+x-acceptance: &acceptance
+  image: ${IBANKING_TEST_IMAGE:?Set an isolated acceptance image}
+  environment: &smtp
+    SMTP_HOST: mailpit
+    SMTP_PORT: "1025"
+    SMTP_USERNAME: ""
+    SMTP_PASSWORD: ""
+    SMTP_SSL: "false"
+    SMTP_STARTTLS: "false"
+    SMTP_FROM: ibanking@example.test
+
+services:
+  sqlserver:
+    environment:
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    ports: !override ["127.0.0.1:14331:1433"]
+  db-init:
+    <<: *acceptance
+  account:
+    <<: *acceptance
+    ports: !override ["127.0.0.1:8101:8001"]
+  payment:
+    <<: *acceptance
+    environment:
+      <<: *smtp
+      ACCOUNT_SERVICE_URL: http://account-faults:9000
+      TUITION_SERVICE_URL: http://tuition-faults:9000
+    ports: !override ["127.0.0.1:8102:8002"]
+  tuition:
+    <<: *acceptance
+    ports: !override ["127.0.0.1:8103:8003"]
+  mailpit:
+    ports: !override ["127.0.0.1:8026:8025", "127.0.0.1:1026:1025"]
+  account-faults:
+    image: ${IBANKING_TEST_IMAGE:?Set an isolated acceptance image}
+    command: ["python", "-m", "uvicorn", "infra.fault_proxy:app", "--host", "0.0.0.0", "--port", "9000"]
+    environment:
+      FAULT_TARGET_URL: http://account:8001
+    depends_on:
+      account:
+        condition: service_healthy
+    ports: ["127.0.0.1:9101:9000"]
+  tuition-faults:
+    image: ${IBANKING_TEST_IMAGE:?Set an isolated acceptance image}
+    command: ["python", "-m", "uvicorn", "infra.fault_proxy:app", "--host", "0.0.0.0", "--port", "9000"]
+    environment:
+      FAULT_TARGET_URL: http://tuition:8003
+    depends_on:
+      tuition:
+        condition: service_healthy
+    ports: ["127.0.0.1:9102:9000"]

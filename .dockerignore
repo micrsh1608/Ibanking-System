@@ -1,0 +1,15 @@
+.git
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.env
+.env.*
+infra/env/*.env
+*.log
+artifacts
+node_modules
+test-results
+playwright-report
+submission

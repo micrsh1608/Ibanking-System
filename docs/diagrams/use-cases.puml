@@ -1,0 +1,45 @@
+@startuml
+left to right direction
+actor "Người thanh toán" as Payer
+actor "Dịch vụ SMTP" as Mail
+rectangle "Phân hệ đóng học phí iBanking" {
+  usecase "UC01\nĐăng nhập" as Login
+  usecase "Xem hồ sơ người trả\nvà tài khoản (chỉ đọc)" as Profile
+  usecase "UC02\nTra cứu MSSV / hóa đơn" as Lookup
+  usecase "UC03\nChọn học phí cần đóng" as Select
+  usecase "Chọn một / nhiều\nhóa đơn theo học kỳ" as Selected
+  usecase "Chọn toàn bộ\nhóa đơn chưa trả" as All
+  usecase "Xác nhận danh sách\nvà tổng tiền" as Confirm
+  usecase "UC04\nXác minh OTP" as OTP
+  usecase "UC05\nThanh toán học phí" as Pay
+  usecase "UC06\nXem kết quả / lịch sử" as History
+  usecase "UC07\nĐăng xuất" as Logout
+  usecase "Nhận email\nxác nhận thành công" as Receipt
+}
+Payer --> Login
+Payer --> Profile
+Payer --> Lookup
+Payer --> Select
+Payer --> Pay
+Payer --> History
+Payer --> Logout
+Payer --> Receipt
+Mail --> OTP
+Mail --> Receipt
+Selected -|> Select
+All -|> Select
+Pay ..> Confirm : <<include>>
+Pay ..> OTP : <<include>>
+Confirm ..> Select : <<include>>
+note left of Payer
+  Người trả là chủ tài khoản đã đăng nhập.
+  Có thể đóng cho MSSV của sinh viên khác.
+end note
+note bottom of OTP
+  OTP qua SMTP, 5 phút, dùng một lần.
+  Gửi lại làm mất hiệu lực xác minh cũ.
+end note
+note bottom of History
+  UI và REST đã có, chỉ xem giao dịch đúng chủ.
+end note
+@enduml

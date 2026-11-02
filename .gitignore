@@ -9,10 +9,18 @@ __pycache__/
 .env
 .env.*
 !.env.example
+infra/env/*.env
 
 # File phát sinh
 *.log
 *.zip
+.coverage
+htmlcov/
+.ruff_cache/
+artifacts/
+node_modules/
+test-results/
+playwright-report/
 
 # File SQL Server
 *.bak

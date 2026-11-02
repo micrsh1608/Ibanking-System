@@ -1,0 +1,10 @@
+{
+  "course": "Kiến trúc hướng dịch vụ",
+  "group": "Nhóm 12",
+  "lecturer": "TS. Dương Hữu Phúc",
+  "members": [
+    {"name": "Phạm Minh Huy", "student_id": "524H009"},
+    {"name": "Điền sau", "student_id": "Điền sau"},
+    {"name": "Điền sau", "student_id": "Điền sau"}
+  ]
+}

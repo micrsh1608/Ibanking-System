@@ -1,0 +1,639 @@
+{
+  "run_id": "1d770842",
+  "project": "ibanking-acceptance-1d770842",
+  "started_at_utc": "2026-11-02T06:25:42.006232Z",
+  "sql_server": "127.0.0.1,14331",
+  "checks": [
+    {
+      "name": "Clean installation and 5-10 minute demo rehearsal",
+      "result": "PASS",
+      "details": {
+        "new_volumes": true,
+        "selected_and_all_unpaid": true,
+        "otp_and_receipts_smtp": true,
+        "seed_repeat_kept_balance_and_paid_status": true,
+        "payment_ids": [
+          "f8cf5d19-064c-42b4-91e4-19b9e54f760f",
+          "04894b3f-4704-43a9-9f88-595a7a8a53ef"
+        ]
+      }
+    },
+    {
+      "name": "Concurrent payment load with exact three-database audit",
+      "result": "PASS",
+      "details": {
+        "workers": 16,
+        "payments": 32,
+        "invoices": 64,
+        "response_codes": {
+          "200": 32
+        },
+        "p50_seconds": 4.073,
+        "p95_seconds": 4.849,
+        "max_seconds": 4.852,
+        "convergence_seconds": 15.417,
+        "completed_per_second": 2.076,
+        "ledger_and_invoice_audit": [
+          {
+            "payment_id": "33a7409c-8805-4caf-964a-298b582c16f4",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "eb817b5f-0dc7-449c-afb6-b2381a3da36b",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "d528a6aa-8d9f-4312-87ee-20dab9a718fb",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "fd2b5658-f160-4e12-a6b9-46459a9c8853",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "621ba24d-3495-4db3-92c0-3b024ed9e66a",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "ccfe4242-e2eb-4e19-b443-e78ee2825da2",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "fcf87cec-5ce0-4466-8c44-8036016f5dbc",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "e1aef890-6541-42e2-927e-e4c6d4e291e8",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "0901c3f7-b42d-4959-ae58-dfa8a9caa7c6",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "1db327b3-ec65-4b00-b775-6bc442fc457e",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "80276737-f727-43e0-a9be-c80d2a5c9c13",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "ef373e80-5315-49d4-8638-18222a0f6af5",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "113112b6-40bf-4606-84ac-aad60e887233",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "c8d62a3c-12a2-4341-8e55-8a6f84ceae07",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "8d54704f-e0ad-4c46-8f13-a6c94193f3d9",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "e4edd892-6d58-41b2-a286-8d2a1b169fd5",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "34cd4633-8183-4a62-b852-da675615a7d4",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "3989f894-425c-4d18-900d-424121f32e20",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "7e89ce8c-4a17-439c-bf9d-a617e48507f8",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "ae7b2653-f00a-4324-8670-c461557fdadd",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "6211f0d8-1bc8-4543-a40b-827ddc637e91",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "980fdccc-9aef-4d48-ab20-ecf7677a7272",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "5d8c5f71-db41-4272-b638-44313198b14c",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "e6d07a36-0ccf-4709-a6f6-13c548113225",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "a8cb3dcb-d06a-4f42-9559-90a2cf3180f2",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "a421aa1b-b85b-438e-8426-4d91fbe87b12",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "afb9ce0f-8025-4447-baef-8e3661eba152",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "bdba8303-bf76-4cd2-b3eb-b9bcec231012",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "1ef938ec-9f23-4bea-bf5a-5a51cad6ccab",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "86aba9ea-cc8d-4a71-b506-440017e3db02",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "81dc39f9-474e-48e2-99f2-b6d7a2264947",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          },
+          {
+            "payment_id": "45e0fcbf-4b0c-45b8-b532-b4ac75e9a290",
+            "invoice_count": 2,
+            "amount": "1000000.00",
+            "debits": 1,
+            "balance": "6000000.00",
+            "status": "SUCCEEDED"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Lost committed account reply over real HTTP",
+      "result": "PASS",
+      "details": {
+        "payment_id": "ccc9b2bb-718a-410e-98cb-dd23cae164c7",
+        "invoice_count": 1,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "9000000.00",
+        "status": "SUCCEEDED",
+        "delayed_reply_seconds": 14
+      }
+    },
+    {
+      "name": "Lost committed tuition reply over real HTTP",
+      "result": "PASS",
+      "details": {
+        "payment_id": "d62229cd-e016-4736-a03e-33dc32c630af",
+        "invoice_count": 1,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "9000000.00",
+        "status": "SUCCEEDED",
+        "delayed_reply_seconds": 14
+      }
+    },
+    {
+      "name": "Docker network partition and recovery",
+      "result": "PASS",
+      "details": {
+        "payment_id": "0e6377f7-3454-499a-99ab-d1946dee8606",
+        "invoice_count": 1,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "9000000.00",
+        "status": "SUCCEEDED"
+      }
+    },
+    {
+      "name": "SIGKILL Payment after Account commit and before reply",
+      "result": "PASS",
+      "details": {
+        "payment_id": "284dcc3d-96a5-45d0-9ee9-b98328c01a73",
+        "invoice_count": 1,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "9000000.00",
+        "status": "SUCCEEDED"
+      }
+    },
+    {
+      "name": "SQL Server SIGKILL rolls back an uncommitted balance and ledger",
+      "result": "PASS",
+      "details": {
+        "payment_id": "fa66364d-a852-4f0d-bef0-7082e151c6c0",
+        "invoice_count": 1,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "9000000.00",
+        "status": "SUCCEEDED",
+        "uncommitted_entry_count": 0
+      }
+    }
+  ],
+  "status": "PASS",
+  "clean_image_build": true,
+  "load": {
+    "workers": 16,
+    "payments": 32,
+    "invoices": 64,
+    "response_codes": {
+      "200": 32
+    },
+    "p50_seconds": 4.073,
+    "p95_seconds": 4.849,
+    "max_seconds": 4.852,
+    "convergence_seconds": 15.417,
+    "completed_per_second": 2.076,
+    "ledger_and_invoice_audit": [
+      {
+        "payment_id": "33a7409c-8805-4caf-964a-298b582c16f4",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "eb817b5f-0dc7-449c-afb6-b2381a3da36b",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "d528a6aa-8d9f-4312-87ee-20dab9a718fb",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "fd2b5658-f160-4e12-a6b9-46459a9c8853",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "621ba24d-3495-4db3-92c0-3b024ed9e66a",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "ccfe4242-e2eb-4e19-b443-e78ee2825da2",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "fcf87cec-5ce0-4466-8c44-8036016f5dbc",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "e1aef890-6541-42e2-927e-e4c6d4e291e8",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "0901c3f7-b42d-4959-ae58-dfa8a9caa7c6",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "1db327b3-ec65-4b00-b775-6bc442fc457e",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "80276737-f727-43e0-a9be-c80d2a5c9c13",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "ef373e80-5315-49d4-8638-18222a0f6af5",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "113112b6-40bf-4606-84ac-aad60e887233",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "c8d62a3c-12a2-4341-8e55-8a6f84ceae07",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "8d54704f-e0ad-4c46-8f13-a6c94193f3d9",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "e4edd892-6d58-41b2-a286-8d2a1b169fd5",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "34cd4633-8183-4a62-b852-da675615a7d4",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "3989f894-425c-4d18-900d-424121f32e20",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "7e89ce8c-4a17-439c-bf9d-a617e48507f8",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "ae7b2653-f00a-4324-8670-c461557fdadd",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "6211f0d8-1bc8-4543-a40b-827ddc637e91",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "980fdccc-9aef-4d48-ab20-ecf7677a7272",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "5d8c5f71-db41-4272-b638-44313198b14c",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "e6d07a36-0ccf-4709-a6f6-13c548113225",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "a8cb3dcb-d06a-4f42-9559-90a2cf3180f2",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "a421aa1b-b85b-438e-8426-4d91fbe87b12",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "afb9ce0f-8025-4447-baef-8e3661eba152",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "bdba8303-bf76-4cd2-b3eb-b9bcec231012",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "1ef938ec-9f23-4bea-bf5a-5a51cad6ccab",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "86aba9ea-cc8d-4a71-b506-440017e3db02",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "81dc39f9-474e-48e2-99f2-b6d7a2264947",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      },
+      {
+        "payment_id": "45e0fcbf-4b0c-45b8-b532-b4ac75e9a290",
+        "invoice_count": 2,
+        "amount": "1000000.00",
+        "debits": 1,
+        "balance": "6000000.00",
+        "status": "SUCCEEDED"
+      }
+    ]
+  },
+  "image_id": "sha256:16728d4aad6ad42aa45876c8232384437a47ab21fb2942c8d1ad1253e1847fbd",
+  "finished_at_utc": "2026-11-02T06:29:17.666259Z",
+  "volumes_retained": [
+    "ibanking-acceptance-1d770842_sqlserver-data",
+    "ibanking-acceptance-1d770842_mailpit-data"
+  ]
+}
