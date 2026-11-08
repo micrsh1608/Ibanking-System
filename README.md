@@ -4,6 +4,16 @@ Dự án giữa kỳ môn **Kiến trúc hướng dịch vụ**, Nhóm 12. Hệ 
 
 Ứng dụng gồm ba service **Account**, **Payment**, **Tuition**, sử dụng FastAPI, SQLAlchemy và SQL Server. Giao diện viết bằng HTML/CSS/JavaScript. Có thể khởi động toàn bộ ứng dụng bằng Docker từ một cửa sổ PowerShell.
 
+## Chạy nhanh
+
+Sau khi đã cài Docker Desktop và chuẩn bị `infra/env/docker.env` (xem [mục 2](#2-cài-đặt-và-chạy-lần-đầu)), mở PowerShell tại thư mục dự án và chạy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+Lệnh khởi động toàn bộ hệ thống và hiện log ngay trong terminal; nhấn **Ctrl+C** để dừng. Mở Web tại [http://127.0.0.1:8001/ui/](http://127.0.0.1:8001/ui/). Thêm `-Detached` để chạy nền, thêm `-PrepareDemo` để tạo dữ liệu demo ở lần chạy đầu.
+
 ## Mục lục
 
 1. [Chức năng và kiến trúc](#1-chức-năng-và-kiến-trúc)
