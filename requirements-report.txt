@@ -1,0 +1,3 @@
+# Optional PDF authoring dependencies; not needed for Docker application runtime.
+reportlab==4.4.9
+pypdf==6.10.0

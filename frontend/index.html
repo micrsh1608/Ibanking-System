@@ -8,8 +8,11 @@
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="./payments.css">
+    <link rel="stylesheet" href="./account-forms.css">
+    <link rel="stylesheet" href="./payment-rules.css">
     <script src="./app.js" defer></script>
     <script src="./payments.js" defer></script>
+    <script src="./account-forms.js" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
@@ -77,9 +80,9 @@
                         <path d="M17 14.5h.01"/>
                     </svg>
                 </span>
-                <p class="eyebrow">CHÀO MỪNG TRỞ LẠI</p>
-                <h2>Đăng nhập iBanking</h2>
-                <p class="muted login-subtitle">Mọi thông tin tài khoản, trong một góc nhìn.</p>
+                <p class="eyebrow" id="authEyebrow">CHÀO MỪNG TRỞ LẠI</p>
+                <h2 id="authTitle">Đăng nhập iBanking</h2>
+                <p class="muted login-subtitle" id="authSubtitle">Mọi thông tin tài khoản, trong một góc nhìn.</p>
                 <form id="loginForm">
                     <label for="username">Tên đăng nhập</label>
                     <div class="input-wrap">
@@ -332,7 +335,7 @@
                         <div>
                             <p class="eyebrow">CÙNG BẠN TRÊN HÀNH TRÌNH HỌC TẬP</p>
                             <h2>Học phí gọn gàng. Sẵn sàng bước tiếp.</h2>
-                            <p>Đóng một học kỳ hoặc toàn bộ công nợ, xác nhận qua email.</p>
+                            <p>Thanh toán toàn bộ công nợ học phí, xác nhận qua email.</p>
                         </div>
                         <button class="primary banner-action" id="startTuitionButton" type="button">Đóng học phí <span aria-hidden="true">→</span></button>
                     </article>
@@ -372,7 +375,37 @@
                                 <dd id="identityNumber">—</dd>
                             </div>
                         </dl>
-                        <p class="profile-hint">Thông tin được hiển thị từ hồ sơ tài khoản hiện tại.</p>
+                        <p class="profile-hint">Mã xác minh được gửi đến email bạn cập nhật. Sau khi xác minh thành công, OTP và biên nhận thanh toán được gửi đến chính địa chỉ đó.</p>
+                        <p id="profileEmailStatus" class="inline-notice" role="status"></p>
+                        <button id="verifyCurrentEmailButton" class="secondary" type="button" hidden>Xác minh hoặc đổi email</button>
+                        <section id="emailVerificationPanel" class="profile-edit-form email-verification-panel" hidden aria-label="Xác minh email mới">
+                            <h3>Xác minh địa chỉ email</h3>
+                            <p>Mã xác minh đã được yêu cầu cho <strong id="pendingEmailAddress"></strong>. Hồ sơ và email đang dùng chưa thay đổi.</p>
+                            <p id="emailProofCountdown" class="muted" role="status"></p>
+                            <form id="emailVerificationForm">
+                                <label for="emailVerificationCode">Mã xác minh email gồm 6 chữ số</label>
+                                <div class="account-form-grid"><div class="span-two"><input id="emailVerificationCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></div></div>
+                                <div class="account-form-actions"><button id="confirmEmailButton" class="primary" type="submit">Xác minh và lưu hồ sơ</button><button id="cancelEmailButton" class="secondary" type="button">Hủy yêu cầu</button></div>
+                            </form>
+                            <div class="account-form-grid"><div class="span-two"><label for="emailResendPassword">Mật khẩu hiện tại để gửi lại mã</label><input id="emailResendPassword" type="password" autocomplete="current-password" maxlength="256"></div></div>
+                            <button id="resendEmailButton" class="secondary" type="button">Gửi lại mã xác minh email</button>
+                            <p class="account-form-hint">Chưa nhận được thư? Kiểm tra địa chỉ và thư rác. Nếu nhập nhầm email, hủy yêu cầu rồi cập nhật lại. Mã này chỉ xác minh hồ sơ; OTP thanh toán được gửi riêng.</p>
+                        </section>
+                        <p class="email-delivery-notice" id="profileMailNotice" hidden></p>
+                        <button id="editProfileButton" class="secondary" type="button">Cập nhật thông tin</button>
+                        <form id="profileForm" class="profile-edit-form" hidden aria-label="Cập nhật thông tin cá nhân">
+                            <h3>Cập nhật hồ sơ</h3>
+                            <div class="account-form-grid">
+                                <div class="span-two"><label for="profileFullName">Họ và tên</label><input id="profileFullName" autocomplete="name" minlength="2" maxlength="100" required></div>
+                                <div class="span-two"><label for="profileEmail">Email nhận OTP và biên nhận</label><input id="profileEmail" type="email" autocomplete="email" maxlength="255" required></div>
+                                <div><label for="profilePhone">Số điện thoại</label><input id="profilePhone" type="tel" autocomplete="tel" maxlength="20"></div>
+                                <div><label for="profileIdentity">CMND / CCCD</label><input id="profileIdentity" maxlength="20"></div>
+                                <div class="span-two"><label for="profilePassword">Mật khẩu hiện tại để xác nhận</label><input id="profilePassword" type="password" autocomplete="current-password" maxlength="256" required></div>
+                            </div>
+                            <p class="account-form-hint">Mọi lần lưu hồ sơ đều cần nhập mã gửi đến email bạn vừa điền, kể cả khi giữ nguyên email. Hồ sơ chỉ được cập nhật sau khi xác minh thành công.</p>
+                            <div class="account-form-actions"><button id="saveProfileButton" class="primary" type="submit">Lưu thông tin</button><button id="cancelProfileButton" class="secondary" type="button">Hủy</button></div>
+                        </form>
+
                     </article>
                     <aside class="card privacy-card">
                         <span class="welcome-icon">
@@ -405,15 +438,19 @@
                                 </form>
                                 <div id="tuitionNotice" class="inline-notice" role="status" aria-live="polite" hidden></div>
                                 <div id="invoiceSelection" hidden>
+                                    <h3 class="tuition-section-title">Thông tin học phí</h3>
                                     <div class="student-heading"><div><span class="muted">Sinh viên</span><h3 id="studentName"></h3><p id="studentMssv" class="muted"></p></div><span class="soft-badge" id="invoiceCount"></span></div>
-                                    <fieldset class="selection-modes"><legend>Cách thanh toán</legend>
-                                        <label><input type="radio" name="selectionMode" value="ALL_UNPAID" checked> Toàn bộ học phí chưa đóng</label>
-                                        <label><input type="radio" name="selectionMode" value="SELECTED"> Chọn hóa đơn / học kỳ</label>
-                                    </fieldset>
-                                    <div class="table-scroll"><table class="data-table"><caption class="sr-only">Các hóa đơn học phí</caption><thead><tr><th scope="col">Chọn</th><th scope="col">Học kỳ</th><th scope="col" class="number">Số tiền</th><th scope="col">Trạng thái</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-                                    <div class="selection-summary"><span id="selectedCount">Chưa chọn hóa đơn</span><div><span>Tổng đã chọn</span><strong id="selectedTotal">0,00 ₫</strong></div></div>
-                                    <p id="balanceWarning" class="balance-warning" hidden>Số dư hiện tại không đủ cho các hóa đơn đã chọn.</p>
-                                    <button class="primary wide" id="confirmSelectionButton" type="button" disabled>Xác nhận hóa đơn</button>
+                                    <p class="full-payment-note">Thanh toán toàn bộ công nợ chưa đóng của MSSV. Mỗi hóa đơn được trả đủ 100%, không nhập số tiền hoặc chia nhỏ khoản học phí.</p>
+                                    <div class="table-scroll"><table class="data-table"><caption class="sr-only">Các hóa đơn học phí</caption><thead><tr><th scope="col">Học kỳ</th><th scope="col" class="number">Số tiền</th><th scope="col">Trạng thái</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
+                                    <section class="payment-eligibility-panel" aria-labelledby="eligibilityHeading"><h3 id="eligibilityHeading">Thông tin thanh toán</h3>
+                                    <div class="available-balance-row"><span>Số dư khả dụng</span><strong id="availableBalance">—</strong></div>
+                                    <div class="selection-summary"><span id="selectedCount">Chưa có công nợ</span><div><span>Số tiền cần thanh toán</span><strong id="selectedTotal">0,00 ₫</strong></div></div>
+                                    <p id="balanceWarning" class="balance-warning" hidden>Số dư khả dụng không đủ để thanh toán toàn bộ công nợ.</p>
+                                    <details class="payment-terms"><summary>Thỏa thuận và điều khoản thanh toán</summary><ul><li>Thanh toán đủ toàn bộ hóa đơn chưa đóng đã được hệ thống tra cứu và xác nhận; không thanh toán một phần.</li><li>Bạn cho phép trích đúng tổng số tiền hiển thị từ tài khoản đang đăng nhập sau khi xác minh OTP.</li><li>Hóa đơn thay đổi hoặc số dư không còn đủ sẽ được kiểm tra lại trước khi trừ tiền.</li><li>Khi đang xử lý hoặc mất kết nối, tra cứu lại cùng mã giao dịch để tránh tạo yêu cầu trùng.</li></ul><p>Phiên bản điều khoản: 2026-11-03.</p></details>
+                                    <label class="terms-consent"><input id="acceptPaymentTerms" type="checkbox"> Tôi đã đọc, đồng ý điều khoản và xác nhận thanh toán toàn bộ công nợ.</label>
+                                    <p id="eligibilityNotice" class="inline-notice" role="status" hidden></p>
+                                    <button class="primary wide" id="confirmSelectionButton" type="button" disabled>Xác nhận giao dịch</button>
+                                    </section>
                                 </div>
                             </article>
                             <article class="card confirmation-card" id="paymentCard" hidden>
@@ -422,6 +459,8 @@
                                 <div id="paymentSnapshot"></div>
                                 <div class="payment-total"><span>Tổng thanh toán</span><strong id="paymentTotal"></strong></div>
                                 <p class="muted" id="confirmationHint">Danh sách và tổng tiền đã được xác nhận từ hệ thống.</p>
+                                <p id="paymentMailNotice" class="email-delivery-notice" hidden></p>
+                                <p id="paymentEligibilityNotice" class="inline-notice" role="status" hidden></p>
                                 <button class="primary wide" id="sendOtpButton" type="button">Gửi mã xác thực qua email</button>
                                 <form id="otpForm" class="otp-form" hidden>
                                     <p id="otpDelivery" class="muted"></p>
@@ -431,6 +470,7 @@
                                     <button class="primary wide" id="payButton" type="submit">Xác nhận &amp; thanh toán</button>
                                 </form>
                                 <button class="primary wide" id="resumeProcessButton" type="button" hidden>Tiếp tục thanh toán giao dịch này</button>
+                                <button class="secondary" id="cancelDraftButton" type="button" hidden>Hủy và tra cứu lại</button>
                             </article>
                             <article id="paymentResult" class="card payment-result" role="status" aria-live="polite" hidden>
                                 <div class="result-symbol" id="resultSymbol" aria-hidden="true"></div><p class="eyebrow" id="resultEyebrow"></p><h2 id="resultTitle"></h2><p id="resultMessage"></p>
@@ -441,7 +481,7 @@
                         </div>
                         <aside class="card payer-card"><p class="eyebrow">NGƯỜI THANH TOÁN</p><h2>Thông tin từ tài khoản</h2><p class="muted">Thông tin được điền tự động từ hồ sơ đã đăng nhập.</p><dl class="payer-fields">
                             <div><dt>Họ và tên</dt><dd id="payerFullName">—</dd></div><div><dt>CMND / CCCD</dt><dd id="payerIdentity">—</dd></div><div><dt>Số điện thoại</dt><dd id="payerPhone">—</dd></div><div><dt>Email nhận OTP</dt><dd id="payerEmail">—</dd></div><div><dt>Tài khoản thanh toán</dt><dd id="payerAccount">—</dd></div><div><dt>Số dư hiện tại</dt><dd id="payerBalance">—</dd></div>
-                        </dl><div class="payer-note">Email xác nhận sẽ được gửi khi các hóa đơn đã thanh toán thành công.</div></aside>
+                        </dl><p id="payerDetailsWarning" class="inline-notice" hidden></p><button id="payerProfileButton" class="secondary" type="button" hidden>Cập nhật hồ sơ trước khi thanh toán</button><div class="payer-note">Email xác nhận sẽ được gửi khi các hóa đơn đã thanh toán thành công.</div></aside>
                     </div>
                 </section>
                 <section id="historyContent" hidden aria-label="Lịch sử thanh toán">

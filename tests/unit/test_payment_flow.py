@@ -2,7 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from services.account.database import SessionLocal as AccountSession
 from services.account.models import Account, AccountEntry
@@ -21,17 +21,17 @@ def balance_and_entries():
 def test_auth_ownership_and_server_controlled_snapshot(stack):
     assert stack.payment.get('/api/v1/payments').status_code == 401
     assert stack.payment.post('/api/v1/payments', headers={**stack.headers, 'Idempotency-Key': str(uuid4())},
-        json={'mssv': 'SV2026001', 'selection_mode': 'SELECTED', 'invoice_ids': [1], 'amount': '1.00'}).status_code == 422
-    payment = stack.create(ids=[2, 1])
+        json={'mssv': 'SV2026001', 'selection_mode': 'ALL_UNPAID', 'terms_accepted': True, 'amount': '1.00'}).status_code == 422
+    payment = stack.create()
     key = payment['payment_id']
-    assert Decimal(payment['total_amount']) == Decimal('5000000.00')
-    assert [item['invoice_id'] for item in payment['items']] == [1, 2]
+    assert Decimal(payment['total_amount']) == Decimal('9000000.00')
+    assert [item['invoice_id'] for item in payment['items']] == [1, 2, 3]
     replay = stack.payment.post('/api/v1/payments', headers={**stack.headers, 'Idempotency-Key': key},
-        json={'mssv': 'SV2026001', 'selection_mode': 'SELECTED', 'invoice_ids': [1, 2]})
+        json={'mssv': 'SV2026001', 'selection_mode': 'ALL_UNPAID', 'terms_accepted': True})
     assert replay.status_code == 200
     assert replay.json() == payment
     changed = stack.payment.post('/api/v1/payments', headers={**stack.headers, 'Idempotency-Key': key},
-        json={'mssv': 'SV2026001', 'selection_mode': 'SELECTED', 'invoice_ids': [1]})
+        json={'mssv': 'ANOTHER_MSSV', 'selection_mode': 'ALL_UNPAID', 'terms_accepted': True})
     assert changed.status_code == 409
     other = {'Authorization': 'Bearer ' + token(2)}
     for suffix in ('', '/send-otp', '/process'):
@@ -40,9 +40,12 @@ def test_auth_ownership_and_server_controlled_snapshot(stack):
     assert stack.payment.get('/api/v1/payments', headers=other).json()['items'] == []
 
 
-@pytest.mark.parametrize('mode,ids,total', [('SELECTED', [1], '2000000.00'), ('ALL_UNPAID', None, '9000000.00')])
-def test_success_and_repeated_process_only_debit_once(stack, mode, ids, total):
-    payment = stack.create(mode=mode, ids=ids)
+@pytest.mark.parametrize('single_fee,total', [(True, '2000000.00'), (False, '9000000.00')])
+def test_success_and_repeated_process_only_debit_once(stack, single_fee, total):
+    if single_fee:
+        with TuitionSession.begin() as db:
+            db.execute(delete(TuitionInvoice).where(TuitionInvoice.id != 1))
+    payment = stack.create()
     key = payment['payment_id']
     assert stack.process(key).status_code == 409
     stack.verify(key)
@@ -53,11 +56,12 @@ def test_success_and_repeated_process_only_debit_once(stack, mode, ids, total):
     assert len(entries) == 1 and entries[0].payment_id == key
     with TuitionSession() as db:
         assert db.get(TuitionInvoice, 1).paid_payment_id == key
-        assert db.get(TuitionInvoice, 2).status == ('PAID' if mode == 'ALL_UNPAID' else 'UNPAID')
+        if not single_fee:
+            assert all(db.get(TuitionInvoice, value).status == 'PAID' for value in (2, 3))
 
 
 def test_insufficient_balance_releases_entire_group(stack):
-    payment = stack.create(ids=[1, 2])
+    payment = stack.create()
     with AccountSession.begin() as db:
         db.get(Account, 1).balance = Decimal('1000000.00')
     stack.verify(payment['payment_id'])
@@ -65,7 +69,7 @@ def test_insufficient_balance_releases_entire_group(stack):
     assert response.status_code == 409 and response.json()['status'] == 'FAILED'
     assert balance_and_entries() == (Decimal('1000000.00'), [])
     with TuitionSession() as db:
-        assert all(db.get(TuitionInvoice, value).status == 'UNPAID' for value in (1, 2))
+        assert all(db.get(TuitionInvoice, value).status == 'UNPAID' for value in (1, 2, 3))
 
 
 @pytest.mark.parametrize('service,path_suffix,phase', [('account', '/internal/accounts/debit', 'DEBIT'),
@@ -81,7 +85,7 @@ def test_lost_reply_after_commit_recovers_without_double_effect(stack, service, 
     assert response.json()['phase'] == phase
     assert stack.process(key).json()['status'] == 'SUCCEEDED'
     balance, entries = balance_and_entries()
-    assert balance == Decimal('8000000.00') and len(entries) == 1
+    assert balance == Decimal('1000000.00') and len(entries) == 1
 
 
 @pytest.mark.parametrize('fault,expected', [('conflict', 'REFUNDED'), ('conflict_after', 'SUCCEEDED')])
@@ -91,7 +95,7 @@ def test_fence_before_refund_and_never_refund_paid_invoices(stack, fault, expect
     stack.services.faults[('tuition', f'/internal/tuition/reservations/{key}/finalize')] = fault
     assert stack.process(key).json()['status'] == expected
     balance, entries = balance_and_entries()
-    assert balance == Decimal('10000000.00' if expected == 'REFUNDED' else '8000000.00')
+    assert balance == Decimal('10000000.00' if expected == 'REFUNDED' else '1000000.00')
     assert len(entries) == (2 if expected == 'REFUNDED' else 1)
 
 
@@ -121,7 +125,7 @@ def test_otp_attempts_persist_and_verified_code_cannot_be_reused(stack):
             json={'challenge_id': challenge['challenge_id'], 'otp': '000000'}).status_code == 400
     assert stack.payment.post(f'/api/v1/payments/{key}/verify-otp', headers=stack.headers,
         json={'challenge_id': challenge['challenge_id'], 'otp': '123456'}).status_code == 429
-    other = stack.create(ids=[2])['payment_id']
+    other = stack.create()['payment_id']
     stack.verify(other)
     assert stack.payment.post(f'/api/v1/payments/{other}/verify-otp', headers=stack.headers,
         json={'challenge_id': challenge['challenge_id'], 'otp': '123456'}).status_code == 409

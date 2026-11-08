@@ -1,0 +1,5 @@
+# Generated deliverables must retain their bytes and avoid text/line-ending diffs.
+*.pdf binary
+*.pptx binary
+*.png binary
+*.zip binary

@@ -1,5 +1,10 @@
 # Kế hoạch hoàn thiện trong bảy ngày
 
+**Điều chỉnh 03/11:** theo yêu cầu bám sát đề bài và câu trả lời mới của người
+dùng, chỉ thanh toán toàn bộ công nợ MSSV, có đủ hồ sơ/số dư và đồng ý điều khoản.
+Các ý chọn từng kỳ trong lịch ban đầu bên dưới là lịch sử; quy tắc hiện hành ở
+[đối chiếu yêu cầu](tuition-requirements-review.md).
+
 Lập ngày 01/11/2026. Người dùng cho biết còn một tuần; dự kiến làm 02–08/11/2026.
 Nhóm 12 gồm ba thành viên; đã có thông tin Phạm Minh Huy — 524H009, hai thành
 viên điền sau. Phân công dưới đây theo vai trò; nhóm bổ sung phân công thực tế.

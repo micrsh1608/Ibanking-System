@@ -31,6 +31,7 @@ class ReserveRequest(BaseModel):
     mssv: str = Field(min_length=1, max_length=24)
     items: list[ReservationSelection] = Field(min_length=1, max_length=100)
     expected_total: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
+    require_all_unpaid: bool = False
 
     @model_validator(mode='after')
     def unique_items(self):

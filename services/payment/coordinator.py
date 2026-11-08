@@ -10,6 +10,8 @@ from services.payment.models.payment import PaymentTransaction
 from services.payment.schemas import PaymentView
 from shared.locking import session_lock
 from shared.time import utcnow
+from services.payment.policy import is_legacy_draft
+from shared.observability import log_event
 
 TERMINAL = {'SUCCEEDED', 'FAILED', 'REFUNDED'}
 
@@ -31,6 +33,8 @@ def update(payment_id, **fields):
         row = db.get(PaymentTransaction, payment_id)
         for field, value in fields.items():
             setattr(row, field, value)
+    log_event('payment', 'payment_state', payment_id=payment_id,
+              **{name: fields[name] for name in ('status', 'phase') if name in fields})
 
 
 def validate_operation(payment, result, statuses):
@@ -55,6 +59,7 @@ def succeeded(payment_id):
         payment.error_message, payment.next_retry_at = None, None
         payment.completed_at = payment.completed_at or utcnow()
         enqueue_receipt(db, payment)
+    log_event('payment', 'payment_state', payment_id=payment_id, status='SUCCEEDED', phase='DONE')
 
 
 def defer(payment, error):
@@ -72,6 +77,10 @@ def process_payment(payment_id, services=None):
         payment = load_payment(key)
         if payment.status in TERMINAL:
             return PaymentView.model_validate(payment)
+        if is_legacy_draft(payment):
+            update(key, status='FAILED', phase='DONE', next_retry_at=None,
+                error_message='Giao dịch cũ chưa theo quy tắc trả toàn bộ và điều khoản mới; vui lòng tạo giao dịch mới.')
+            return payment_view(key)
         if payment.status == 'PENDING_OTP':
             raise HTTPException(409, 'Cần xác minh OTP trước khi xử lý')
         if payment.status == 'OTP_VERIFIED':

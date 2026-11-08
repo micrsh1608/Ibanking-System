@@ -4,7 +4,7 @@
     const labels = { PENDING_OTP: "Chờ xác thực", OTP_VERIFIED: "Đã xác thực", PROCESSING: "Đang xử lý", PENDING_RECONCILIATION: "Đang đối soát", SUCCEEDED: "Thành công", FAILED: "Không thành công", REFUNDED: "Đã hoàn tiền" };
     const invoiceLabels = { UNPAID: "Chưa đóng", RESERVED: "Đang xử lý", PAID: "Đã đóng" };
     const storageKey = "ibanking.pendingPayment"; // Only opaque IDs; never tokens, OTP, balances or personal data.
-    const state = { epoch: 0, tuition: null, selection: new Set(), mode: "ALL_UNPAID", payment: null, intent: null, challenge: null, timer: null, poll: null, pollCount: 0, cursor: null, historyVersion: 0, restoreUser: null, busy: false, creating: false };
+    const state = { epoch: 0, tuition: null, selection: new Set(), payment: null, intent: null, challenge: null, timer: null, poll: null, pollCount: 0, cursor: null, historyVersion: 0, historyPages: 0, historySignature: null, restoreUser: null, busy: false, creating: false, lookupVersion: 0, lookupCode: null, lookupBusy: false, lookupTimer: null, payerSignature: null, debtChanged: false };
     const el = (tag, text, className) => { const item = document.createElement(tag); if (text !== undefined) item.textContent = String(text); if (className) item.className = className; return item; };
     const date = value => value ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(value)) : "—";
     const cents = value => { const [integer, fraction = ""] = String(value).split("."); return BigInt(integer) * 100n + BigInt(fraction.padEnd(2, "0").slice(0, 2)); };
@@ -29,7 +29,7 @@
         if (button.disabled) return;
         button.disabled = true; button.setAttribute("aria-busy", "true");
         try { await task(); } catch (error) { if (!error.stale) showMessage(error.message, true); }
-        finally { button.disabled = false; button.removeAttribute("aria-busy"); tick(); }
+        finally { button.disabled = false; button.removeAttribute("aria-busy"); syncControls(); tick(); }
     }
     function remember(key) { try { sessionStorage.setItem(storageKey, JSON.stringify({ payment_id: key, user_id: currentUser.id })); } catch { /* History remains available if browser storage is disabled. */ } }
     function forget() { try { sessionStorage.removeItem(storageKey); } catch { } }
@@ -37,48 +37,92 @@
     function badge(status, invoice = false) { return el("span", (invoice ? invoiceLabels : labels)[status] || status, "soft-badge " + (status === "FAILED" ? "error" : (["PROCESSING", "PENDING_RECONCILIATION", "RESERVED", "REFUNDED"].includes(status) ? "warning" : (["PENDING_OTP", "UNPAID"].includes(status) ? "neutral" : "")))); }
     function updatePayer() {
         const user = currentUser, account = currentAccount;
-        const values = { payerFullName: user?.full_name, payerIdentity: user?.identity_number, payerPhone: user?.phone, payerEmail: user?.email, payerAccount: account?.account_number, payerBalance: account ? (balanceHidden ? "••••••••" : formatMoney(account.balance)) : null };
+        const balance = account ? (balanceHidden ? "••••••••" : formatMoney(account.balance)) : null;
+        const values = { payerFullName: user?.full_name, payerIdentity: user?.identity_number, payerPhone: user?.phone, payerEmail: user?.email, payerAccount: account?.account_number, payerBalance: balance, availableBalance: balance };
         Object.entries(values).forEach(([id, value]) => { byId(id).textContent = value || (user ? "Chưa cập nhật" : "—"); });
+        const signature = JSON.stringify([user?.id, user?.full_name, user?.phone, user?.email, user?.email_verified, user?.email_delivery, account?.id]);
+        if (state.payerSignature && state.payerSignature !== signature) byId("acceptPaymentTerms").checked = false;
+        state.payerSignature = signature;
+        notice("payerDetailsWarning", payerIssue()); byId("payerProfileButton").hidden = !payerIssue();
+        syncControls();
+    }
+    function payerIssue() {
+        if (!currentUser || !currentAccount) return "Vui lòng đăng nhập để thanh toán.";
+        if (currentUser.email_verified !== true) return "Email chưa được xác minh. Vào Thông tin cá nhân để xác minh trước khi thanh toán.";
+        const digits = (currentUser.phone || "").replace(/\D/g, "").length;
+        if (!currentUser.full_name?.trim() || !/^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(currentUser.email || "") || !/^[+0-9 ()-]{7,20}$/.test(currentUser.phone || "") || digits < 7 || digits > 15) return "Cần có đủ họ tên, số điện thoại và email hợp lệ trong hồ sơ trước khi thanh toán.";
+        return "";
+    }
+    function selectionTotal() { return (state.tuition?.invoices || []).filter(row => row.status !== "PAID").reduce((sum, row) => sum + cents(row.amount_due), 0n); }
+    function eligibilityIssue() {
+        if (payerIssue()) return payerIssue();
+        if (currentAccount.status !== "ACTIVE") return "Tài khoản đang khóa hoặc chưa hoạt động.";
+        if (!state.tuition || state.lookupCode !== byId("studentCode").value.trim()) return "Vui lòng tra cứu MSSV trước khi xác nhận.";
+        if (state.tuition.invoices.some(row => row.status === "RESERVED")) return "Công nợ đang được giao dịch khác xử lý. Vui lòng chờ kết quả rồi tra cứu lại.";
+        if (selectionTotal() <= 0n) return "MSSV này không còn học phí chưa đóng để thanh toán.";
+        if (cents(currentAccount.balance) < selectionTotal()) return "Số dư khả dụng không đủ để thanh toán toàn bộ công nợ.";
+        if (!byId("acceptPaymentTerms").checked) return "Đọc và đồng ý điều khoản trước khi xác nhận giao dịch.";
+        return "";
+    }
+    function legacyDraft(payment) { return payment && ["PENDING_OTP", "OTP_VERIFIED"].includes(payment.status) && (payment.selection_mode !== "ALL_UNPAID" || !payment.terms_accepted_at || (!!currentUser && (payment.payer_email !== currentUser.email || (!!payment.email_delivery && !!currentUser.email_delivery && payment.email_delivery !== currentUser.email_delivery)))); }
+    function draftIssue() {
+        if (!state.payment || !["PENDING_OTP", "OTP_VERIFIED"].includes(state.payment.status)) return "";
+        if (state.debtChanged) return "Công nợ đã thay đổi hoặc đang được giao dịch khác xử lý. Hủy giao dịch chờ và tra cứu lại trước khi thanh toán.";
+        if (currentAccount && cents(currentAccount.balance) < cents(state.payment.total_amount)) return "Số dư đã thay đổi và không còn đủ cho giao dịch này. Bạn có thể hủy giao dịch chờ để tra cứu lại.";
+        return "";
+    }
+    function syncControls() {
+        const locked = !!state.intent || !!state.payment || state.creating;
+        byId("studentCode").disabled = locked;
+        byId("lookupButton").disabled = locked || state.lookupBusy || !byId("studentCode").value.trim();
+        byId("acceptPaymentTerms").disabled = locked || state.lookupBusy || !state.tuition || selectionTotal() <= 0n;
+        byId("confirmSelectionButton").disabled = locked || state.lookupBusy || !!eligibilityIssue();
+        byId("balanceWarning").hidden = !currentAccount || !state.tuition || selectionTotal() <= cents(currentAccount.balance);
+        notice("eligibilityNotice", state.tuition && !locked ? eligibilityIssue() : "");
+        const invalid = !state.payment || !!payerIssue() || currentAccount?.status !== "ACTIVE" || !!draftIssue() || legacyDraft(state.payment);
+        for (const id of ["sendOtpButton", "resumeProcessButton"]) byId(id).disabled = invalid || state.busy || byId(id).getAttribute("aria-busy") === "true";
+        byId("cancelDraftButton").disabled = state.busy || state.creating || byId("cancelDraftButton").getAttribute("aria-busy") === "true";
+        notice("paymentEligibilityNotice", draftIssue(), true);
     }
     function lockLookup(locked) {
-        byId("studentCode").disabled = locked;
-        byId("lookupButton").disabled = locked;
-        byId("confirmSelectionButton").disabled = locked || state.selection.size === 0;
-        document.querySelectorAll("#invoiceSelection input").forEach(input => { input.disabled = locked || input.dataset.unavailable === "true"; });
+        syncControls();
     }
     function renderSelection() {
         const rows = byId("invoiceRows"); rows.replaceChildren();
         const invoices = state.tuition?.invoices || [];
         invoices.forEach(invoice => {
-            const tr = el("tr"), select = el("td"), input = el("input");
-            input.type = "checkbox"; input.checked = state.selection.has(invoice.id); input.disabled = invoice.status !== "UNPAID";
-            input.dataset.unavailable = String(invoice.status !== "UNPAID"); input.setAttribute("aria-label", `Chọn học kỳ ${invoice.semester}`);
-            input.addEventListener("change", () => { state.mode = "SELECTED"; document.querySelector('input[name="selectionMode"][value="SELECTED"]').checked = true; input.checked ? state.selection.add(invoice.id) : state.selection.delete(invoice.id); updateSelection(); });
-            select.append(input); tr.append(select, el("td", invoice.semester), el("td", formatMoney(invoice.amount_due), "number")); const status = el("td"); status.append(badge(invoice.status, true)); tr.append(status); rows.append(tr);
+            const tr = el("tr"); tr.append(el("td", invoice.semester), el("td", formatMoney(invoice.amount_due), "number")); const status = el("td"); status.append(badge(invoice.status, true)); tr.append(status); rows.append(tr);
         });
-        byId("invoiceCount").textContent = `${invoices.filter(row => row.status === "UNPAID").length} hóa đơn chưa đóng`;
+        byId("invoiceCount").textContent = `${invoices.filter(row => row.status !== "PAID").length} hóa đơn chưa hoàn tất`;
         updateSelection();
     }
     function updateSelection() {
-        const selected = (state.tuition?.invoices || []).filter(row => state.selection.has(row.id));
-        const total = selected.reduce((sum, row) => sum + cents(row.amount_due), 0n);
-        byId("selectedTotal").textContent = formatMoney(decimal(total));
-        byId("selectedCount").textContent = `Đã chọn ${selected.length} hóa đơn`;
-        byId("confirmSelectionButton").disabled = !selected.length || !!state.intent || !!state.payment;
-        byId("balanceWarning").hidden = !currentAccount || total <= cents(currentAccount.balance);
+        byId("selectedTotal").textContent = formatMoney(decimal(selectionTotal()));
+        byId("selectedCount").textContent = `${(state.tuition?.invoices || []).filter(row => row.status !== "PAID").length} hóa đơn chưa hoàn tất`;
+        syncControls();
+    }
+    function invalidateLookup() {
+        clearTimeout(state.lookupTimer); state.lookupVersion += 1; state.lookupBusy = false; state.lookupCode = null;
+        state.tuition = null; state.selection.clear(); byId("invoiceSelection").hidden = true; byId("acceptPaymentTerms").checked = false;
+        byId("studentName").textContent = byId("studentMssv").textContent = ""; byId("invoiceRows").replaceChildren();
+        byId("selectedTotal").textContent = "0,00 ₫"; notice("tuitionNotice"); syncControls();
     }
     async function lookup() {
-        notice("tuitionNotice");
+        clearTimeout(state.lookupTimer);
         const code = byId("studentCode").value.trim();
-        if (!code) return;
-        state.tuition = null; state.selection.clear(); byId("invoiceSelection").hidden = true;
-        const data = await api(`/api/v1/tuition/${encodeURIComponent(code)}`);
-        state.tuition = data; state.mode = "ALL_UNPAID";
-        state.selection = new Set(data.invoices.filter(row => row.status === "UNPAID").map(row => row.id));
-        document.querySelector('input[name="selectionMode"][value="ALL_UNPAID"]').checked = true;
-        byId("studentName").textContent = data.full_name; byId("studentMssv").textContent = `MSSV: ${data.mssv}`;
-        byId("invoiceSelection").hidden = false; renderSelection();
-        if (!state.selection.size) notice("tuitionNotice", "Hiện không có học phí có thể thanh toán. Các khoản đã đóng hoặc đang xử lý được hiển thị bên dưới.");
+        if (!code || state.intent || state.payment) return;
+        invalidateLookup(); const version = ++state.lookupVersion; state.lookupBusy = true; syncControls(); notice("tuitionNotice", "Đang tra cứu học phí và số dư khả dụng…");
+        try {
+            if (!await loadAccount()) return;
+            if (version !== state.lookupVersion || code !== byId("studentCode").value.trim()) return;
+            const data = await api(`/api/v1/tuition/${encodeURIComponent(code)}`);
+            if (version !== state.lookupVersion || code !== byId("studentCode").value.trim()) return;
+            state.tuition = data; state.lookupCode = code;
+            state.selection = new Set(data.invoices.filter(row => row.status === "UNPAID").map(row => row.id));
+            byId("studentName").textContent = data.full_name; byId("studentMssv").textContent = `MSSV: ${data.mssv}`;
+            byId("invoiceSelection").hidden = false; renderSelection(); notice("tuitionNotice");
+        } catch (error) { if (!error.stale && version === state.lookupVersion) notice("tuitionNotice", error.message, true); }
+        finally { if (version === state.lookupVersion) { state.lookupBusy = false; syncControls(); } }
     }
     function showIntent(text) {
         byId("pendingIntentCard").hidden = false; byId("pendingIntentMessage").textContent = text;
@@ -88,9 +132,9 @@
     async function createIntent() {
         if (state.creating) return;
         if (!state.intent) {
-            if (!state.tuition || !state.selection.size) return;
-            const payload = { mssv: state.tuition.mssv, selection_mode: state.mode };
-            if (state.mode === "SELECTED") payload.invoice_ids = [...state.selection].sort((a, b) => a - b);
+            const issue = eligibilityIssue();
+            if (issue) { notice("tuitionNotice", issue, true); syncControls(); return; }
+            const payload = { mssv: state.tuition.mssv, selection_mode: "ALL_UNPAID", terms_accepted: true };
             state.intent = { key: crypto.randomUUID(), payload };
             remember(state.intent.key);
         }
@@ -102,6 +146,9 @@
             if (!result.payment_id) throw new Error("Chưa nhận được kết quả tạo giao dịch. Thử lại bằng mã hiện tại.");
             state.intent = null; byId("pendingIntentCard").hidden = true; renderPayment(result);
             byId("paymentCard").scrollIntoView({ behavior: "smooth", block: "start" });
+            if (result.status === "PENDING_OTP" && !result.active_challenge && !legacyDraft(result)) {
+                await action("sendOtpButton", sendOTP);
+            }
         } catch (error) {
             if (error.stale) throw error;
             if ([400, 404, 422].includes(error.status) || (error.status === 409 && !error.message.startsWith("Giao dịch đang"))) {
@@ -119,12 +166,15 @@
     }
     function renderPayment(payment) {
         const previous = state.payment;
+        if (previous?.payment_id !== payment.payment_id) state.debtChanged = false;
         state.payment = payment; state.intent = null;
         byId("pendingIntentCard").hidden = true; byId("lookupCard").hidden = true; byId("paymentCard").hidden = false;
         byId("paymentReference").textContent = payment.payment_id; byId("paymentTotal").textContent = formatMoney(payment.total_amount);
         byId("paymentStatusBadge").replaceWith(Object.assign(badge(payment.status), { id: "paymentStatusBadge" }));
         snapshot(payment);
+        byId("confirmationHint").textContent = `Thanh toán toàn bộ các hóa đơn đã xác nhận. Điều khoản ${payment.terms_version || "chưa xác nhận"}.`;
         const pendingOTP = payment.status === "PENDING_OTP", verified = payment.status === "OTP_VERIFIED";
+        window.accountForms?.deliveryNotice(byId("paymentMailNotice"), payment.email_delivery || currentUser?.email_delivery, payment.payer_email);
         if (pendingOTP && payment.active_challenge) {
             if (state.challenge?.challenge_id !== payment.active_challenge.challenge_id) {
                 state.challenge = { ...payment.active_challenge, resendAt: Date.now() + payment.active_challenge.resend_after_seconds * 1000 };
@@ -163,6 +213,16 @@
             remember(payment.payment_id);
             if (["PROCESSING", "PENDING_RECONCILIATION"].includes(payment.status)) schedulePoll();
         }
+        if (legacyDraft(payment)) {
+            byId("sendOtpButton").hidden = byId("otpForm").hidden = byId("resumeProcessButton").hidden = true;
+            byId("paymentResult").hidden = false; byId("newPaymentButton").hidden = false;
+            byId("resultTitle").textContent = "Cần xác nhận giao dịch mới";
+            byId("resultMessage").textContent = "Giao dịch chờ dùng email hoặc thông tin xác nhận cũ. Tạo giao dịch mới để dùng email đã xác minh và xác nhận lại toàn bộ công nợ.";
+            byId("paymentResult").classList.add("pending"); byId("paymentResult").classList.remove("failed");
+            byId("resultSymbol").textContent = "!"; byId("resultEyebrow").textContent = "XÁC NHẬN LẠI CÔNG NỢ"; byId("receiptMessage").textContent = "";
+        }
+        byId("cancelDraftButton").hidden = !pendingOTP && !verified;
+        syncControls();
     }
     function tick() {
         if (!state.challenge) return;
@@ -171,7 +231,7 @@
         byId("otpCountdown").textContent = remaining ? `Mã hết hạn sau ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "Mã đã hết hạn. Vui lòng gửi lại mã.";
         byId("resendOtpButton").disabled = cooldown > 0;
         byId("resendOtpButton").textContent = cooldown ? `Gửi lại sau ${cooldown}s` : "Gửi lại mã";
-        byId("payButton").disabled = !remaining || state.busy;
+        byId("payButton").disabled = !remaining || state.busy || !/^[0-9]{6}$/.test(byId("otpCode").value.trim()) || !!payerIssue() || currentAccount?.status !== "ACTIVE" || !!draftIssue() || legacyDraft(state.payment);
     }
     async function sendOTP() {
         const key = state.payment.payment_id;
@@ -184,9 +244,11 @@
             clearInterval(state.timer); state.timer = setInterval(tick, 1000); tick(); byId("otpCode").focus();
         } catch (error) { if (!error.stale && state.payment) { try { await refreshPayment(); } catch (refreshError) { if (refreshError.stale) throw refreshError; renderPayment(state.payment); } } throw error; }
     }
-    async function refreshPayment() {
+    async function refreshPayment({ quiet = false } = {}) {
         if (!state.payment) return;
-        const payment = await api(`/api/v1/payments/${state.payment.payment_id}`);
+        const key = state.payment.payment_id;
+        const payment = await api(`/api/v1/payments/${key}`);
+        if (state.payment?.payment_id !== key || (quiet && state.busy)) return;
         renderPayment(payment);
     }
     function schedulePoll() {
@@ -221,12 +283,14 @@
         clearInterval(state.timer); clearTimeout(state.poll); state.poll = null; state.timer = null;
         state.challenge = null; state.pollCount = 0; renderPayment(payment); switchView("tuition");
     }
-    async function loadHistory(more = false) {
+    async function loadHistory(more = false, quiet = false) {
         const version = ++state.historyVersion;
-        notice("historyNotice", "Đang lấy lịch sử giao dịch…");
+        if (!quiet) notice("historyNotice", "Đang lấy lịch sử giao dịch…");
         const cursor = more ? state.cursor : null;
         const result = await api("/api/v1/payments?limit=10" + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""));
         if (version !== state.historyVersion) return;
+        const signature = JSON.stringify(result.items.map(row => [row.payment_id, row.status, row.updated_at, row.receipt_status]));
+        if (quiet && signature === state.historySignature) return;
         if (!more) byId("historyRows").replaceChildren();
         result.items.forEach(payment => {
             const row = el("tr"), reference = el("td"); reference.append(el("span", date(payment.created_at)), el("code", payment.transaction_code, "muted"));
@@ -234,25 +298,73 @@
             const status = el("td"); status.append(badge(payment.status));
             const detail = el("td"), button = el("button", "Xem", "small-button"); button.type = "button"; button.setAttribute("aria-label", `Xem giao dịch ${payment.transaction_code}`);
             button.addEventListener("click", () => { button.disabled = true; openPayment(payment.payment_id).catch(error => { if (!error.stale) showMessage(error.message, true); }).finally(() => { button.disabled = false; }); }); detail.append(button);
+            row.dataset.paymentId = payment.payment_id;
+            row.dataset.paymentStatus = payment.status;
             row.append(reference, student, el("td", formatMoney(payment.total_amount), "number"), status, detail); byId("historyRows").append(row);
         });
         state.cursor = result.next_cursor; byId("moreHistoryButton").hidden = !state.cursor;
+        state.historyPages = more ? state.historyPages + 1 : 1;
+        state.historySignature = more ? null : signature;
         byId("historyEmpty").hidden = byId("historyRows").children.length > 0; notice("historyNotice");
     }
     function reset() {
-        state.epoch += 1; state.historyVersion += 1; clearInterval(state.timer); clearTimeout(state.poll);
-        Object.assign(state, { tuition: null, selection: new Set(), mode: "ALL_UNPAID", payment: null, intent: null, challenge: null, timer: null, poll: null, pollCount: 0, cursor: null, restoreUser: null, busy: false, creating: false });
+        state.epoch += 1; state.historyVersion += 1; state.lookupVersion += 1; clearInterval(state.timer); clearTimeout(state.poll); clearTimeout(state.lookupTimer);
+        Object.assign(state, { tuition: null, selection: new Set(), payment: null, intent: null, challenge: null, timer: null, poll: null, pollCount: 0, cursor: null, historyPages: 0, historySignature: null, restoreUser: null, busy: false, creating: false, lookupCode: null, lookupBusy: false, lookupTimer: null, payerSignature: null, debtChanged: false });
+        byId("acceptPaymentTerms").checked = false;
         ["studentCode", "otpCode"].forEach(id => { byId(id).value = ""; });
         ["invoiceRows", "historyRows", "paymentSnapshot"].forEach(id => byId(id).replaceChildren());
         ["studentName", "studentMssv", "paymentReference", "paymentTotal", "otpDelivery", "resultTitle", "resultMessage", "receiptMessage", "pendingIntentReference"].forEach(id => { byId(id).textContent = ""; });
         byId("selectedTotal").textContent = "0,00 ₫"; byId("selectedCount").textContent = "Chưa chọn hóa đơn"; byId("invoiceCount").textContent = "";
         ["invoiceSelection", "paymentCard", "paymentResult", "pendingIntentCard", "otpForm", "historyEmpty", "moreHistoryButton"].forEach(id => { byId(id).hidden = true; });
         byId("lookupCard").hidden = false; notice("tuitionNotice"); notice("historyNotice"); lockLookup(false); steps(0);
-        ["payerFullName", "payerIdentity", "payerPhone", "payerEmail", "payerAccount", "payerBalance"].forEach(id => { byId(id).textContent = "—"; });
+        ["payerFullName", "payerIdentity", "payerPhone", "payerEmail", "payerAccount", "payerBalance", "availableBalance"].forEach(id => { byId(id).textContent = "—"; });
     }
-    function startAnother() {
-        if (state.payment && !terminal.has(state.payment.status)) return;
+    async function startAnother() {
+        if (state.busy || state.creating) return;
+        if (state.payment && ["PENDING_OTP", "OTP_VERIFIED"].includes(state.payment.status)) {
+            state.busy = true; syncControls(); tick();
+            try { await api(`/api/v1/payments/${state.payment.payment_id}/cancel`, { method: "POST" }); }
+            finally { state.busy = false; syncControls(); tick(); }
+        } else if (state.payment && !terminal.has(state.payment.status)) return;
         forget(); reset(); updatePayer(); byId("studentCode").focus();
+    }
+    const tuitionSignature = data => JSON.stringify([data.mssv, data.full_name, data.invoices.map(row => [row.id, row.version, row.status, row.amount_due])]);
+    async function refreshLive() {
+        if (state.busy || state.creating || state.intent) return;
+        if (currentView === "history") {
+            if (state.historyPages <= 1) { await loadHistory(false, true); return; }
+            const version = state.historyVersion;
+            const rows = [...byId("historyRows").children];
+            const pendingRows = rows.filter(row => !terminal.has(row.dataset.paymentStatus));
+            await Promise.all(pendingRows.map(async row => {
+                const payment = await api(`/api/v1/payments/${row.dataset.paymentId}`);
+                if (version !== state.historyVersion || !row.isConnected) return;
+                row.dataset.paymentStatus = payment.status;
+                row.children[3].replaceChildren(badge(payment.status));
+            }));
+            return;
+        }
+        if (currentView !== "tuition" || state.lookupBusy) return;
+        if (state.payment) {
+            const key = state.payment.payment_id;
+            if (!terminal.has(state.payment.status) && !state.poll) await refreshPayment({ quiet: true });
+            if (state.payment?.payment_id !== key || !["PENDING_OTP", "OTP_VERIFIED"].includes(state.payment.status)) return;
+            const data = await api(`/api/v1/tuition/${encodeURIComponent(state.payment.mssv)}`);
+            if (state.busy || state.payment?.payment_id !== key || !["PENDING_OTP", "OTP_VERIFIED"].includes(state.payment.status)) return;
+            const unpaid = data.invoices.filter(row => row.status === "UNPAID");
+            state.debtChanged = data.invoices.some(row => row.status === "RESERVED") || unpaid.length !== state.payment.items.length || state.payment.items.some(item => !unpaid.some(row => row.id === item.invoice_id && row.version === item.invoice_version && cents(row.amount_due) === cents(item.amount)));
+            syncControls(); tick();
+            return;
+        }
+        const code = state.lookupCode, version = state.lookupVersion;
+        if (!code || code !== byId("studentCode").value.trim() || !state.tuition) return;
+        const data = await api(`/api/v1/tuition/${encodeURIComponent(code)}`);
+        if (state.payment || version !== state.lookupVersion || code !== byId("studentCode").value.trim()) return;
+        if (tuitionSignature(data) !== tuitionSignature(state.tuition)) {
+            state.tuition = data; byId("acceptPaymentTerms").checked = false;
+            byId("studentName").textContent = data.full_name; renderSelection();
+            notice("tuitionNotice", "Công nợ vừa được cập nhật. Kiểm tra lại thông tin trước khi xác nhận.");
+        }
     }
     function enter(view) {
         updatePayer();
@@ -265,8 +377,11 @@
             } catch { /* Optional restoration only. */ }
         }
     }
-    byId("tuitionLookupForm").addEventListener("submit", event => { event.preventDefault(); action("lookupButton", async () => { try { await lookup(); } catch (error) { if (!error.stale) notice("tuitionNotice", error.message, true); throw error; } }); });
-    document.querySelectorAll('input[name="selectionMode"]').forEach(input => input.addEventListener("change", () => { state.mode = input.value; if (state.mode === "ALL_UNPAID") state.selection = new Set(state.tuition.invoices.filter(row => row.status === "UNPAID").map(row => row.id)); renderSelection(); }));
+    byId("tuitionLookupForm").addEventListener("submit", event => { event.preventDefault(); lookup(); });
+    byId("studentCode").addEventListener("input", () => { if (state.intent || state.payment) return; invalidateLookup(); if (byId("studentCode").value.trim()) state.lookupTimer = setTimeout(lookup, 650); });
+    byId("acceptPaymentTerms").addEventListener("change", syncControls);
+    byId("otpCode").addEventListener("input", tick);
+    byId("payerProfileButton").addEventListener("click", () => switchView("profile"));
     byId("confirmSelectionButton").addEventListener("click", () => action("confirmSelectionButton", createIntent));
     byId("retryIntentButton").addEventListener("click", () => action("retryIntentButton", createIntent));
     byId("sendOtpButton").addEventListener("click", () => action("sendOtpButton", sendOTP));
@@ -274,11 +389,12 @@
     byId("otpForm").addEventListener("submit", event => { event.preventDefault(); action("payButton", pay); });
     byId("resumeProcessButton").addEventListener("click", () => action("resumeProcessButton", pay));
     byId("checkPaymentButton").addEventListener("click", () => action("checkPaymentButton", async () => { state.pollCount = 0; await refreshPayment(); }));
-    byId("newPaymentButton").addEventListener("click", startAnother);
+    byId("newPaymentButton").addEventListener("click", () => action("newPaymentButton", startAnother));
+    byId("cancelDraftButton").addEventListener("click", () => action("cancelDraftButton", startAnother));
     byId("copyPaymentButton").addEventListener("click", () => action("copyPaymentButton", async () => { await navigator.clipboard.writeText(state.payment.payment_id); showMessage("Đã sao chép mã giao dịch."); }));
     byId("reloadHistoryButton").addEventListener("click", () => action("reloadHistoryButton", () => loadHistory()));
     byId("moreHistoryButton").addEventListener("click", () => action("moreHistoryButton", () => loadHistory(true)));
     ["tuitionNav", "startTuitionButton"].forEach(id => byId(id).addEventListener("click", () => switchView("tuition")));
     ["historyNav", "resultHistoryButton"].forEach(id => byId(id).addEventListener("click", () => switchView("history")));
-    window.tuitionUI = { reset, forget, enter, updatePayer };
+    window.tuitionUI = { reset, forget, enter, updatePayer, refreshLive, isBusy: () => state.busy || state.creating || state.lookupBusy };
 })();

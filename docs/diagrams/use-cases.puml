@@ -3,12 +3,13 @@ left to right direction
 actor "Người thanh toán" as Payer
 actor "Dịch vụ SMTP" as Mail
 rectangle "Phân hệ đóng học phí iBanking" {
+  usecase "UC08\nCập nhật hồ sơ / email\n(xác nhận mật khẩu)" as UpdateProfile
+  usecase "UC09\nXác minh email hồ sơ\nqua mã gửi đến địa chỉ đích" as VerifyEmail
   usecase "UC01\nĐăng nhập" as Login
   usecase "Xem hồ sơ người trả\nvà tài khoản (chỉ đọc)" as Profile
   usecase "UC02\nTra cứu MSSV / hóa đơn" as Lookup
-  usecase "UC03\nChọn học phí cần đóng" as Select
-  usecase "Chọn một / nhiều\nhóa đơn theo học kỳ" as Selected
-  usecase "Chọn toàn bộ\nhóa đơn chưa trả" as All
+  usecase "UC03\nXem toàn bộ công nợ\nchưa đóng của MSSV" as Select
+  usecase "Đồng ý điều khoản\nvà kiểm tra đủ số dư" as Consent
   usecase "Xác nhận danh sách\nvà tổng tiền" as Confirm
   usecase "UC04\nXác minh OTP" as OTP
   usecase "UC05\nThanh toán học phí" as Pay
@@ -17,6 +18,7 @@ rectangle "Phân hệ đóng học phí iBanking" {
   usecase "Nhận email\nxác nhận thành công" as Receipt
 }
 Payer --> Login
+Payer --> UpdateProfile
 Payer --> Profile
 Payer --> Lookup
 Payer --> Select
@@ -26,11 +28,12 @@ Payer --> Logout
 Payer --> Receipt
 Mail --> OTP
 Mail --> Receipt
-Selected -|> Select
-All -|> Select
+Mail --> VerifyEmail
+VerifyEmail ..> UpdateProfile : <<extend>>\nemail đổi hoặc chưa xác minh
 Pay ..> Confirm : <<include>>
 Pay ..> OTP : <<include>>
 Confirm ..> Select : <<include>>
+Confirm ..> Consent : <<include>>
 note left of Payer
   Người trả là chủ tài khoản đã đăng nhập.
   Có thể đóng cho MSSV của sinh viên khác.

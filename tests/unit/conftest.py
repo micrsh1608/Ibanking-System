@@ -1,4 +1,6 @@
 import os
+import re
+from itertools import count
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
@@ -64,11 +66,9 @@ class Stack:
         self.internal = {'X-Internal-Key': os.environ['INTERNAL_API_KEY']}
         self.mailer = TestMailer()
 
-    def create(self, mode='SELECTED', ids=None, key=None):
+    def create(self, key=None):
         key = key or str(uuid4())
-        body = {'mssv': 'SV2026001', 'selection_mode': mode}
-        if mode == 'SELECTED':
-            body['invoice_ids'] = ids or [1]
+        body = {'mssv': 'SV2026001', 'selection_mode': 'ALL_UNPAID', 'terms_accepted': True}
         response = self.payment.post('/api/v1/payments', headers={**self.headers, 'Idempotency-Key': key}, json=body)
         assert response.status_code == 201, response.text
         return response.json()
@@ -76,8 +76,9 @@ class Stack:
     def verify(self, key):
         response = self.payment.post(f'/api/v1/payments/{key}/send-otp', headers=self.headers)
         assert response.status_code == 202, response.text
+        code = re.search(r'Mã OTP của bạn:\s*(\d{6})', self.mailer.messages[-1]['body']).group(1)
         response = self.payment.post(f'/api/v1/payments/{key}/verify-otp', headers=self.headers,
-            json={'challenge_id': response.json()['challenge_id'], 'otp': '123456'})
+            json={'challenge_id': response.json()['challenge_id'], 'otp': code})
         assert response.status_code == 200, response.text
 
     def process(self, key):
@@ -100,13 +101,14 @@ class TestMailer:
 @pytest.fixture
 def stack(monkeypatch):
     from services.payment import routes
-    monkeypatch.setattr(routes, 'generate_otp', lambda: '123456')
+    codes = count(123456)
+    monkeypatch.setattr(routes, 'generate_otp', lambda: f'{next(codes):06d}')
     for database in (payment_db, tuition_db, account_db):
         database.Base.metadata.drop_all(database.engine)
         database.Base.metadata.create_all(database.engine)
     with account_db.SessionLocal.begin() as db:
         db.add_all([User(id=value, username=f'user{value}', password_hash='unused', full_name=f'User {value}',
-            email=f'user{value}@example.test', is_active=True) for value in (1, 2)])
+            email=f'user{value}@example.test', email_verified_at=datetime.now(timezone.utc).replace(tzinfo=None), phone='0900000001', is_active=True) for value in (1, 2)])
         db.flush()
         db.add_all([Account(id=value, user_id=value, account_number=f'100000000{value}', balance=Decimal('10000000.00'), status='ACTIVE') for value in (1, 2)])
     with tuition_db.SessionLocal.begin() as db:
@@ -118,9 +120,11 @@ def stack(monkeypatch):
         result = Stack(account, tuition, payment)
         payment_app.dependency_overrides[get_services] = lambda: result.services
         payment_app.dependency_overrides[get_mailer] = lambda: result.mailer
+        account_app.dependency_overrides[get_mailer] = lambda: result.mailer
         try:
             yield result
         finally:
             payment_app.dependency_overrides.clear()
+            account_app.dependency_overrides.clear()
     for database in (payment_db, tuition_db, account_db):
         database.Base.metadata.drop_all(database.engine)

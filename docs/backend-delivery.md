@@ -16,7 +16,7 @@ Thực hiện ngày 02/11/2026, hoàn thành sớm các đầu việc của ba n
 
 1. Chạy `.\start.ps1` hoặc `.\start.ps1 -Detached`.
 2. Account Swagger `http://127.0.0.1:8001/docs`: đăng nhập `huy` / `HuyDemo_123!`.
-3. Tuition Swagger `http://127.0.0.1:8003/docs`: Authorize bằng JWT, tra MSSV `SV2026001` để lấy ID/phiên bản hiện tại.
+3. Tuition Swagger `http://127.0.0.1:8003/docs`: Authorize bằng JWT, tra MSSV `SV20261013` để lấy ID/phiên bản hiện tại.
 4. Payment Swagger `http://127.0.0.1:8002/docs`: Authorize bằng cùng JWT. Tạo payment với `Idempotency-Key` UUID mới, MSSV và SELECTED/ALL_UNPAID.
 5. Kiểm tra danh sách và tổng tiền trả về, gọi send-otp. Docker hiện dùng OTP demo ở log Payment; xem bằng `docker compose --env-file infra/env/docker.env logs --tail 30 payment`.
 6. Gọi verify-otp với `challenge_id` được trả về và mã demo, sau đó gọi process cùng UUID.

@@ -4,9 +4,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from services.account.routes import router
 from services.account.database import engine
 from services.account.internal_routes import router as internal_router
-from fastapi.staticfiles import StaticFiles
+from services.account.static_ui import AccountUI
 from shared.config import PROJECT_ROOT
 from services.account.gateway import router as gateway_router
+from shared.observability import RequestContextMiddleware
 
 
 app = FastAPI(
@@ -18,6 +19,15 @@ app = FastAPI(
 app.include_router(router)
 app.include_router(internal_router)
 app.include_router(gateway_router)
+
+
+@app.middleware('http')
+async def private_responses_not_cached(request, call_next):
+    response=await call_next(request)
+    if request.url.path.startswith(('/users/', '/accounts/', '/auth/')):
+        response.headers['Cache-Control']='no-store'
+        response.headers['Pragma']='no-cache'
+    return response
 
 @app.get("/health")
 def health():
@@ -48,6 +58,7 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 app.mount(
     "/ui",
-    StaticFiles(directory=str(FRONTEND_DIR), html=True),
+    AccountUI(directory=str(FRONTEND_DIR), html=True),
     name="ui",
 )
+app.add_middleware(RequestContextMiddleware, service='account')

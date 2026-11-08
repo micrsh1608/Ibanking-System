@@ -20,6 +20,9 @@ from services.account.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("email_channel IN ('configured','smtp','mailpit')", name='ck_user_email_channel'),
+    )
 
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True
@@ -31,11 +34,40 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(Unicode(100))
     identity_number: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str] = mapped_column(String(255))
+    email_channel: Mapped[str] = mapped_column(String(12), default='smtp', server_default='smtp')
     phone: Mapped[str | None] = mapped_column(String(20))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pending_email: Mapped[str | None] = mapped_column(String(255))
+    email_challenge_id: Mapped[str | None] = mapped_column(String(36))
+    email_code_hash: Mapped[str | None] = mapped_column(String(64))
+    email_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_code_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_code_attempts: Mapped[int] = mapped_column(default=0, server_default='0')
+    email_pending_profile: Mapped[str | None] = mapped_column(Unicode(2000))
+    email_pending_channel: Mapped[str | None] = mapped_column(String(12))
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
+
+    @property
+    def email_verified(self):
+        return self.email_verified_at is not None
+
+    @property
+    def email_delivery(self):
+        from shared.mailer import resolve_email_channel
+        return resolve_email_channel(self.email_channel or 'configured')
+
+    @property
+    def email_verification(self):
+        from shared.time import utcnow
+        if not all((self.pending_email, self.email_challenge_id, self.email_code_hash, self.email_code_expires_at)):
+            return None
+        local, _, domain = self.pending_email.partition('@')
+        return {'challenge_id': self.email_challenge_id, 'expires_at': self.email_code_expires_at,
+            'resend_after_seconds': max(0, 60-int((utcnow()-self.email_code_sent_at).total_seconds())) if self.email_code_sent_at else 0,
+            'delivery_address': local[:1]+'***@'+domain}
 
 
 class Account(Base):

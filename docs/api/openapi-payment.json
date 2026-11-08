@@ -343,6 +343,57 @@
         }
       }
     },
+    "/api/v1/payments/{payment_id}/cancel": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Cancel Draft",
+        "operationId": "cancel_draft_api_v1_payments__payment_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Payment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Chỉ được hủy giao dịch chưa bắt đầu xử lý"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -431,6 +482,15 @@
           "delivery_address": {
             "type": "string",
             "title": "Delivery Address"
+          },
+          "email_delivery": {
+            "type": "string",
+            "enum": [
+              "smtp",
+              "not_configured"
+            ],
+            "title": "Email Delivery",
+            "default": "not_configured"
           }
         },
         "type": "object",
@@ -491,26 +551,20 @@
           },
           "selection_mode": {
             "type": "string",
-            "enum": [
-              "SELECTED",
-              "ALL_UNPAID"
-            ],
-            "title": "Selection Mode"
+            "const": "ALL_UNPAID",
+            "title": "Selection Mode",
+            "default": "ALL_UNPAID"
           },
-          "invoice_ids": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "title": "Invoice Ids"
+          "terms_accepted": {
+            "type": "boolean",
+            "title": "Terms Accepted"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "mssv",
-          "selection_mode"
+          "terms_accepted"
         ],
         "title": "PaymentCreate"
       },
@@ -588,6 +642,19 @@
           "account_id": {
             "type": "integer",
             "title": "Account Id"
+          },
+          "payer_email": {
+            "type": "string",
+            "title": "Payer Email"
+          },
+          "email_delivery": {
+            "type": "string",
+            "enum": [
+              "smtp",
+              "not_configured"
+            ],
+            "title": "Email Delivery",
+            "default": "not_configured"
           },
           "mssv": {
             "type": "string",
@@ -698,6 +765,29 @@
                 "type": "null"
               }
             ]
+          },
+          "terms_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Version"
+          },
+          "terms_accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Accepted At"
           }
         },
         "type": "object",
@@ -706,6 +796,7 @@
           "transaction_code",
           "payer_user_id",
           "account_id",
+          "payer_email",
           "mssv",
           "student_name",
           "selection_mode",
@@ -719,7 +810,9 @@
           "updated_at",
           "completed_at",
           "receipt_status",
-          "active_challenge"
+          "active_challenge",
+          "terms_version",
+          "terms_accepted_at"
         ],
         "title": "PaymentView"
       },

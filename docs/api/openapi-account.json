@@ -6,6 +6,223 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/app-config": {
+      "get": {
+        "tags": [
+          "Application"
+        ],
+        "summary": "Public Config",
+        "operationId": "public_config_app_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Read Current User",
+        "operationId": "read_current_user_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update Profile",
+        "operationId": "update_profile_users_me_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Email mới chờ xác minh; hồ sơ hiện tại chưa đổi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/email-verification/confirm": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Confirm Email",
+        "operationId": "confirm_email_users_me_email_verification_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/email-verification/resend": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Resend Email",
+        "operationId": "resend_email_users_me_email_verification_resend_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailResendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/email-verification": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Cancel Email",
+        "operationId": "cancel_email_users_me_email_verification_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": [
@@ -45,32 +262,6 @@
             }
           }
         }
-      }
-    },
-    "/users/me": {
-      "get": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "Read Current User",
-        "operationId": "read_current_user_users_me_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/accounts/me": {
@@ -428,7 +619,8 @@
               "enum": [
                 "send-otp",
                 "verify-otp",
-                "process"
+                "process",
+                "cancel"
               ],
               "type": "string",
               "title": "Action"
@@ -530,13 +722,13 @@
           },
           "account_id": {
             "type": "integer",
-            "maximum": 9.223372036854776e+18,
+            "maximum": 9.223372036854776E+18,
             "exclusiveMinimum": 0.0,
             "title": "Account Id"
           },
           "payer_user_id": {
             "type": "integer",
-            "maximum": 9.223372036854776e+18,
+            "maximum": 9.223372036854776E+18,
             "exclusiveMinimum": 0.0,
             "title": "Payer User Id"
           },
@@ -562,6 +754,72 @@
           "amount"
         ],
         "title": "DebitRequest"
+      },
+      "EmailChallengeView": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "title": "Challenge Id"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "resend_after_seconds": {
+            "type": "integer",
+            "title": "Resend After Seconds"
+          },
+          "delivery_address": {
+            "type": "string",
+            "title": "Delivery Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "expires_at",
+          "resend_after_seconds",
+          "delivery_address"
+        ],
+        "title": "EmailChallengeView"
+      },
+      "EmailResendRequest": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Current Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password"
+        ],
+        "title": "EmailResendRequest"
+      },
+      "EmailVerificationRequest": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "code"
+        ],
+        "title": "EmailVerificationRequest"
       },
       "HTTPValidationError": {
         "properties": {
@@ -626,6 +884,64 @@
           "status"
         ],
         "title": "OperationResponse"
+      },
+      "ProfileUpdate": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Full Name"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "pattern": "^[^\\s@<>\\x00-\\x1f\\x7f]+@[^\\s@<>\\x00-\\x1f\\x7f]+\\.[^\\s@<>\\x00-\\x1f\\x7f]+$",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^[+0-9 ()-]{7,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "identity_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^[A-Za-z0-9 -]{6,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Number"
+          },
+          "current_password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Current Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "full_name",
+          "email",
+          "current_password"
+        ],
+        "title": "ProfileUpdate"
       },
       "RefundRequest": {
         "properties": {
@@ -698,6 +1014,39 @@
               }
             ],
             "title": "Identity Number"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified"
+          },
+          "email_delivery": {
+            "type": "string",
+            "enum": [
+              "smtp",
+              "not_configured"
+            ],
+            "title": "Email Delivery"
+          },
+          "pending_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Email"
+          },
+          "email_verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailChallengeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -707,7 +1056,11 @@
           "full_name",
           "email",
           "phone",
-          "identity_number"
+          "identity_number",
+          "email_verified",
+          "email_delivery",
+          "pending_email",
+          "email_verification"
         ],
         "title": "UserResponse"
       },

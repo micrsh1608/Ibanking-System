@@ -22,13 +22,13 @@ x-api: &api
     PAYMENT_SERVICE_URL: http://payment:8002
     PAYMENT_RECOVERY_ENABLED: "true"
     PAYMENT_MAIL_ENABLED: "true"
-    SMTP_HOST: ${SMTP_HOST:-mailpit}
-    SMTP_PORT: ${SMTP_PORT:-1025}
+    SMTP_HOST: ${SMTP_HOST:?Set a real SMTP_HOST in infra/env/docker.env}
+    SMTP_PORT: ${SMTP_PORT:-587}
     SMTP_USERNAME: ${SMTP_USERNAME:-}
     SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-    SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+    SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
     SMTP_SSL: ${SMTP_SSL:-false}
-    SMTP_FROM: ${SMTP_FROM:-ibanking@example.test}
+    SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM to the authorized sender in infra/env/docker.env}
   depends_on:
     db-init:
       condition: service_completed_successfully
@@ -53,6 +53,9 @@ services:
 
   db-init:
     <<: *api
+    environment:
+      <<: *environment
+      IBANKING_SEED_DEMO: ${IBANKING_SEED_DEMO:-false}
     command: ["python", "-m", "infra.docker.init_databases"]
     depends_on:
       sqlserver:
@@ -94,16 +97,5 @@ services:
       retries: 12
       start_period: 10s
 
-  mailpit:
-    image: axllent/mailpit:v1.27.4
-    environment:
-      MP_DATABASE: /data/mailpit.db
-    volumes:
-      - mailpit-data:/data
-    ports:
-      - "127.0.0.1:8025:8025"
-      - "127.0.0.1:1025:1025"
-
 volumes:
   sqlserver-data:
-  mailpit-data:

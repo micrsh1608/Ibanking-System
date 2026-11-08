@@ -6,6 +6,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
+from shared.observability import tracing_headers
 
 router = APIRouter(tags=['Web Gateway'])
 
@@ -15,6 +16,7 @@ async def forward(request, service, path):
     if not token:
         raise HTTPException(401, 'Thiếu Bearer token')
     headers = {'Authorization': token, 'Content-Type': 'application/json'}
+    headers.update(tracing_headers())
     key = request.headers.get('idempotency-key')
     if key:
         headers['Idempotency-Key'] = key
@@ -52,5 +54,5 @@ async def payment(payment_id: UUID, request: Request):
 
 
 @router.post('/api/v1/payments/{payment_id}/{action}')
-async def payment_action(payment_id: UUID, action: Literal['send-otp', 'verify-otp', 'process'], request: Request):
+async def payment_action(payment_id: UUID, action: Literal['send-otp', 'verify-otp', 'process', 'cancel'], request: Request):
     return await forward(request, 'payment', f'/api/v1/payments/{payment_id}/{action}')

@@ -9,7 +9,7 @@ trong `tuition_db`. Mã nguồn: `services/tuition/`.
 ```
 
 Cách chạy chung: `.\start.ps1`. Seed tự chạy migration, giữ dữ liệu có sẵn;
-demo `SV2026001` có hai học kỳ 2 triệu và 3 triệu. ID phụ thuộc database đang dùng.
+demo `SV20261013` có hai học kỳ 2 triệu và 3 triệu. ID phụ thuộc database đang dùng.
 
 - API công khai `GET /api/v1/tuition/{mssv}` dùng JWT Account.
 - API nội bộ snapshot/reserve/finalize/release/status dùng `X-Internal-Key`.

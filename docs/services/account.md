@@ -5,6 +5,13 @@ trong hệ thống thanh toán học phí iBanking.
 
 Mã nguồn: `services/account/`. Xem [runbook](../runbook.md) để chạy Windows, Docker và cấu hình SQL login.
 
+Giao diện tại `/ui/`: đăng nhập bằng tài khoản đã được cấp; sau đó chọn
+**Thông tin cá nhân → Cập nhật thông tin** để lưu hồ sơ/email bằng mật khẩu xác
+nhận. API hồ sơ dùng `PUT /users/me`, cấu hình hiển thị dùng `GET /app-config`.
+Không có đăng ký công khai; không cho client tự sửa tiền. Xem
+[bàn giao giao diện tài khoản](../account-ui-delivery.md) và [hợp đồng API](../api.md).
+Đối chiếu mục 1 của đề tại [đăng nhập/thông tin người dùng](../login-user-requirements-review.md).
+
 ## Công nghệ
 
 - Python, FastAPI

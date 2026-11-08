@@ -472,6 +472,11 @@
               }
             ],
             "title": "Expected Total"
+          },
+          "require_all_unpaid": {
+            "type": "boolean",
+            "title": "Require All Unpaid",
+            "default": false
           }
         },
         "additionalProperties": false,

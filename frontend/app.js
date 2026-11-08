@@ -7,6 +7,8 @@ let currentAccount = null;
 let balanceHidden = false;
 let currentView = "overview";
 let messageTimer;
+let accountLoadVersion = 0;
+let liveRefreshing = false;
 function showMessage(text, isError = false) {
     clearTimeout(messageTimer);
     const element = byId("message");
@@ -53,10 +55,12 @@ function renderBalance() {
 }
 function toggleBalance() { balanceHidden = !balanceHidden; renderBalance(); }
 function clearSession() {
+    accountLoadVersion += 1;
     window.tuitionUI?.reset();
     accessToken = null;
     currentUser = null;
     currentAccount = null;
+    window.accountForms?.reset();
     balanceHidden = false;
     currentView = "overview";
     byId("accountSection").hidden = true;
@@ -76,7 +80,8 @@ async function request(path, options = {}) {
         const response = await fetch(path, { ...fetchOptions, signal: controller.signal, cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok && !allowStatuses.includes(response.status)) {
-            const error = new Error(typeof data.detail === "string" ? data.detail : `Yêu cầu thất bại (HTTP ${response.status})`);
+            const detail = typeof data.detail === "string" ? data.detail : Array.isArray(data.detail) ? data.detail.map(item => `${item.loc?.slice(1).join(".") || "Thông tin"}: ${item.msg}`).join("; ") : `Yêu cầu thất bại (HTTP ${response.status})`;
+            const error = new Error(detail);
             error.status = response.status;
             error.data = data;
             throw error;
@@ -88,25 +93,30 @@ async function request(path, options = {}) {
         throw error;
     } finally { clearTimeout(timeout); }
 }
-async function loadAccount() {
+function renderUser(user) {
+    currentUser = user;
+    window.accountForms?.syncProfile();
+    byId("fullName").textContent = user.full_name;
+    byId("userName").textContent = user.username;
+    byId("email").textContent = user.email || "Chưa cập nhật";
+    byId("phone").textContent = user.phone || "Chưa cập nhật";
+    byId("identityNumber").textContent = user.identity_number || "Chưa cập nhật";
+    byId("headerName").textContent = user.full_name;
+    byId("summaryName").textContent = user.full_name;
+    byId("summaryEmail").textContent = user.email || "Chưa cập nhật";
+    byId("avatar").textContent = initials(user.full_name);
+    byId("summaryAvatar").textContent = initials(user.full_name);
+}
+async function loadAccount({ quiet = false } = {}) {
     const tokenUsed = accessToken;
+    const version = ++accountLoadVersion;
     const headers = { Authorization: `Bearer ${tokenUsed}` };
     try {
         const [user, account] = await Promise.all([request("/users/me", { headers }), request("/accounts/me", { headers })]);
         // Không cập nhật giao diện từ phản hồi của phiên đã kết thúc.
-        if (accessToken !== tokenUsed || !tokenUsed) return false;
-        currentUser = user;
+        if (accessToken !== tokenUsed || !tokenUsed || version !== accountLoadVersion) return false;
         currentAccount = account;
-        byId("fullName").textContent = user.full_name;
-        byId("userName").textContent = user.username;
-        byId("email").textContent = user.email || "Chưa cập nhật";
-        byId("phone").textContent = user.phone || "Chưa cập nhật";
-        byId("identityNumber").textContent = user.identity_number || "Chưa cập nhật";
-        byId("headerName").textContent = user.full_name;
-        byId("summaryName").textContent = user.full_name;
-        byId("summaryEmail").textContent = user.email || "Chưa cập nhật";
-        byId("avatar").textContent = initials(user.full_name);
-        byId("summaryAvatar").textContent = initials(user.full_name);
+        renderUser(user);
         byId("accountNumber").textContent = account.account_number;
         const active = account.status === "ACTIVE";
         byId("accountStatus").textContent = active ? "Đang hoạt động" : account.status === "LOCKED" ? "Đang khóa" : "Chưa xác định";
@@ -115,10 +125,10 @@ async function loadAccount() {
         byId("updatedAt").textContent = "Cập nhật lúc " + new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
         byId("loginSection").hidden = true;
         byId("accountSection").hidden = false;
-        switchView(currentView, false);
+        if (!quiet) switchView(currentView, false);
         return true;
     } catch (error) {
-        if (accessToken !== tokenUsed) return false;
+        if (accessToken !== tokenUsed || version !== accountLoadVersion) return false;
         if (error.status === 401 || error.status === 403) {
             clearSession();
             byId("username").focus();
@@ -127,6 +137,18 @@ async function loadAccount() {
         throw error;
     }
 }
+async function refreshLiveData() {
+    if (liveRefreshing || !accessToken || !currentAccount || document.hidden || currentView === "profile" || window.tuitionUI?.isBusy()) return;
+    liveRefreshing = true;
+    try {
+        if (await loadAccount({ quiet: true })) await window.tuitionUI?.refreshLive();
+    } catch { /* Keep the current draft; explicit actions surface connection errors. */ }
+    finally { liveRefreshing = false; }
+}
+setInterval(refreshLiveData, 5000);
+window.addEventListener("focus", refreshLiveData);
+window.addEventListener("online", refreshLiveData);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshLiveData(); });
 byId("loginForm").addEventListener("submit", async event => {
     event.preventDefault();
     const button = byId("loginButton");

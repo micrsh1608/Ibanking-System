@@ -71,7 +71,16 @@ def reserve(data: ReserveRequest, db=Depends(transaction, scope='function')):
     if student is None:
         raise HTTPException(404, 'Không tìm thấy MSSV')
     versions = {item.invoice_id: item.version for item in data.items}
-    rows = invoices_locked(db, versions)
+    if data.require_all_unpaid:
+        # Range locks keep this set stable until reservation commits, including
+        # invoices inserted concurrently for the same student.
+        outstanding = list(db.scalars(select(TuitionInvoice).where(TuitionInvoice.student_id == student.id)
+            .order_by(TuitionInvoice.id).with_hint(TuitionInvoice, 'WITH (UPDLOCK, HOLDLOCK)', dialect_name='mssql')))
+        if any(row.status == 'RESERVED' for row in outstanding) or set(versions) != {row.id for row in outstanding if row.status == 'UNPAID'}:
+            raise HTTPException(409, 'Công nợ đã thay đổi hoặc đang xử lý; tra cứu và xác nhận lại toàn bộ học phí')
+        rows = [row for row in outstanding if row.id in versions]
+    else:
+        rows = invoices_locked(db, versions)
     for row in rows:
         if row.student_id != student.id:
             raise HTTPException(409, 'Hóa đơn không thuộc MSSV đã chọn')

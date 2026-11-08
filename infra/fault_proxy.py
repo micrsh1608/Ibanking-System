@@ -50,7 +50,7 @@ async def forward(path: str, request: Request):
         rule = None
     if rule and rule['mode'] == 'error_before':
         raise HTTPException(503, 'Acceptance-only simulated outage')
-    headers = {name: request.headers[name] for name in ('authorization', 'x-internal-key', 'content-type', 'idempotency-key') if name in request.headers}
+    headers = {name: request.headers[name] for name in ('authorization', 'x-internal-key', 'content-type', 'idempotency-key', 'x-request-id') if name in request.headers}
     async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
         response = await client.request(request.method, os.environ['FAULT_TARGET_URL'] + path,
             params=list(request.query_params.multi_items()), headers=headers, content=await request.body())

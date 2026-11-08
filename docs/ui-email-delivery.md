@@ -1,6 +1,22 @@
-# Bàn giao công việc ngày 05–06/11
+# Gửi email và trình diễn thanh toán
 
-Thực hiện ngày 02/11/2026, tiếp nối backend 02–04/11. Cách chạy giữ nguyên:
+Ứng dụng chính chỉ dùng SMTP thật. Tài khoản SMTP xác định người gửi;
+người nhận là email của tài khoản đang đăng nhập. Mọi lần cập nhật hồ sơ
+được lưu thành bản chờ, gửi mã đến địa chỉ người dùng vừa nhập và chỉ lưu
+sau khi xác minh đúng, kể cả khi giữ nguyên email đã xác minh. OTP/biên nhận
+của giao dịch mới dùng email đã xác minh sau bước cập nhật đó.
+
+Tài khoản `huy` mới chưa có email. Tạo thêm người trả thứ hai bằng:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\demo-data.ps1 -CreateTestAccount -Email 'your-second-real-email'
+```
+
+Tài khoản mới là `huy2` / `HuyDemo_123!`, số dư ban đầu 10 triệu. Đăng nhập
+và xác minh địa chỉ email thật của từng người trên Web trước khi thanh toán.
+Lệnh tạo dữ liệu không gửi mã hoặc tự đánh dấu email đã xác minh.
+
+Cấu hình SMTP thật theo [runbook](runbook.md), sau đó chạy:
 
 ```powershell
 .\start.ps1
@@ -16,8 +32,8 @@ Thực hiện ngày 02/11/2026, tiếp nối backend 02–04/11. Cách chạy gi
   UNIQUE(payment_id,event_type) chặn tạo nhiều sự kiện cho cùng một biên nhận.
 - Worker email độc lập với worker thanh toán, retry/backoff tối đa 300 giây,
   lưu số lần thử/lỗi và tiếp tục sau restart. Gửi mail không gọi debit/finalize.
-- SMTP hỗ trợ login, SSL hoặc STARTTLS. Compose mặc định dùng Mailpit, có volume
-  giữ hộp thư. Biến SMTP thật đặt trong `infra/env/docker.env`; xem [runbook](runbook.md).
+- SMTP hỗ trợ login, SSL hoặc STARTTLS. Compose chính chỉ dùng SMTP thật.
+  Biến SMTP đặt trong `infra/env/docker.env`; xem [runbook](runbook.md).
 
 Mã nguồn chính: `services/payment/mailer.py`, `email_templates.py`, `outbox.py`,
 `routes.py`, `coordinator.py`; revision `20261105_email_outbox` thêm outbox và
@@ -32,7 +48,7 @@ biên nhận và không trừ tiền lại, không tuyên bố gửi mail đúng
 
 - Giữ thiết kế iBanking hiện tại, thêm Đóng học phí và Lịch sử trên máy tính/điện thoại.
 - Hồ sơ người trả, CMND/CCCD, điện thoại, email, tài khoản/số dư lấy từ API và chỉ đọc.
-- Tra MSSV, xem hóa đơn UNPAID/RESERVED/PAID, chọn một/nhiều học kỳ hoặc tất cả.
+- Tra MSSV, xem hóa đơn UNPAID/RESERVED/PAID và trả toàn bộ công nợ chưa đóng.
   UI tính tiền bằng BigInt theo đơn vị xu; server vẫn là nơi chốt snapshot/tổng tiền.
 - Xem lại snapshot trước OTP, nhập mã nhận qua email và thanh toán cùng UUID.
 - Hiển thị đang xử lý/đối soát, thành công, thất bại/hoàn tiền và tình trạng biên nhận.
@@ -50,17 +66,19 @@ bộ. Không cần mở CORS cho nhiều cổng hoặc thêm terminal/service we
 ## Trình diễn
 
 1. Mở [iBanking](http://127.0.0.1:8001/ui/), đăng nhập `huy` / `HuyDemo_123!`.
-2. Chọn **Đóng học phí**, tra `SV2026001`. Nếu demo đã trả hết, tạo sinh viên/hóa
+2. Mở **Thông tin cá nhân**, nhập email thật và xác minh mã nhận tại địa chỉ đó.
+   Sau đó chọn **Đóng học phí**, tra `SV20261013`. Nếu demo đã trả hết, tạo sinh viên/hóa
    đơn demo mới; không đổi hóa đơn PAID về UNPAID để tái diễn lại giao dịch cũ.
-3. Chọn một học kỳ hoặc toàn bộ, kiểm tra danh sách và tổng tiền, gửi OTP.
-4. Mở [Mailpit](http://127.0.0.1:8025) để lấy mã gửi cho email demo của người trả.
+3. Kiểm tra toàn bộ hóa đơn chưa đóng và tổng tiền, đồng ý điều khoản rồi gửi OTP.
+4. Mở hộp thư thật của email đã xác minh của người trả để lấy đúng mã giao dịch.
 5. Nhập OTP, xác nhận thanh toán; xem số dư mới, email biên nhận và **Lịch sử**.
 6. Khi mạng gián đoạn, giữ mã hiện tại, dùng Kiểm tra lại/Lịch sử; không tạo mã mới.
 
-Để nhận thư ở email thật, cấu hình SMTP theo runbook rồi chạy lại start.ps1.
-Mailpit mặc định là hộp thư kiểm thử cục bộ, không chuyển thư đến Gmail/Outlook.
+Để thử hai tài khoản trả cùng học phí, dùng hai phiên độc lập cho `huy` và
+`huy2`, cùng tra một MSSV còn UNPAID và nhận OTP riêng tại email của từng
+người. Chỉ một payment được trừ tiền và hoàn tất nhóm hóa đơn.
 
-## Xác minh
+## Bằng chứng kiểm thử lịch sử ngày 05–06/11
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
@@ -81,8 +99,8 @@ npm run test:e2e
 Playwright dùng Edge đã cài trên Windows, Chromium trên các hệ khác. Node.js chỉ
 là công cụ test; người dùng chạy ứng dụng Docker không cần Node. Browser tích hợp
 của công cụ bị lỗi khởi tạo, nên QA hình ảnh và luồng được thực hiện bằng Edge headless.
-Integration/browser tạo dữ liệu IT riêng trong Docker và giữ ledger để đối chiếu.
-Nghiệm thu SMTP có stop/start Mailpit và restart Payment; không chạy trong lúc
+Integration/browser của lượt kiểm thử lịch sử tạo dữ liệu IT riêng trong Docker
+và giữ ledger để đối chiếu. Lượt đó có stop/start Mailpit và restart Payment; không chạy trong lúc
 đang trình diễn giao dịch khác.
 
 Ngày 07–08/11 còn kiểm thử tải/lỗi hạ tầng mở rộng, báo cáo/slides và diễn tập.

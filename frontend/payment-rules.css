@@ -1,0 +1,13 @@
+.full-payment-note { margin: 20px 0; color: #526770; line-height: 1.7; }
+.tuition-section-title { margin-top: 24px; font-size: 18px; }
+.payment-eligibility-panel { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 22px; }
+.payment-eligibility-panel h3 { margin-bottom: 16px; font-size: 18px; }
+.available-balance-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: #526770; }
+.available-balance-row strong { color: var(--ink); }
+.payment-terms { margin: 22px 0 16px; border-top: 1px solid var(--border); padding-top: 16px; font-size: 13px; color: #526770; }
+.payment-terms summary { cursor: pointer; color: var(--ink); font-weight: 700; }
+.payment-terms ul { padding-left: 20px; line-height: 1.8; }
+.payment-terms p { font-size: 12px; }
+.terms-consent { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; line-height: 1.7; font-size: 13px; }
+.terms-consent input { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 3px; accent-color: var(--accent); }
+#payerProfileButton { padding: 10px 14px; margin-top: 12px; }

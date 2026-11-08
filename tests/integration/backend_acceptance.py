@@ -70,7 +70,7 @@ def new_user():
     username, password = 'IT_' + suffix, 'IT_A1!' + uuid4().hex
     with AccountSession.begin() as db:
         user = User(username=username, password_hash=PasswordHash.recommended().hash(password),
-            full_name='Integration Test', email=suffix + '@example.test', is_active=True)
+            full_name='Integration Test', email=suffix + '@example.test', email_verified_at=utcnow(), phone='0900000001', is_active=True)
         db.add(user)
         db.flush()
         account = Account(user_id=user.id, account_number='IT' + suffix,
@@ -82,6 +82,21 @@ def new_user():
     token = check(request('account', 'POST', '/auth/login', body={'username': username, 'password': password}))['access_token']
     result['headers'] = {'Authorization': 'Bearer ' + token}
     return result
+
+
+def verify_email(user, email=None):
+    profile=check(request('account','GET','/users/me',headers=user['headers']))
+    data={key:profile[key] for key in ('full_name','email','phone','identity_number')}
+    data.update(email=email or profile['email'],current_password=user['password'])
+    pending=check(request('account','PUT','/users/me',headers=user['headers'],body=data),(202,))
+    from tests.integration.mailpit import message_for
+    challenge=pending['email_verification']['challenge_id']
+    message=message_for(challenge,email_verification=True)
+    code=re.search(r'Mã xác minh email của bạn:\s*(\d{6})',message['Text']).group(1)
+    confirmed=check(request('account','POST','/users/me/email-verification/confirm',headers=user['headers'],body={'challenge_id':challenge,'code':code}))
+    assert confirmed['email_verified'] is True
+    user['email']=confirmed['email']
+    return confirmed
 
 
 def new_student(amounts):
@@ -96,10 +111,8 @@ def new_student(amounts):
         return student.mssv, [row.id for row in rows]
 
 
-def create(user, mssv, ids=None):
-    body = {'mssv': mssv, 'selection_mode': 'ALL_UNPAID' if ids is None else 'SELECTED'}
-    if ids is not None:
-        body['invoice_ids'] = ids
+def create(user, mssv):
+    body = {'mssv': mssv, 'selection_mode': 'ALL_UNPAID', 'terms_accepted': True}
     return check(request('payment', 'POST', '/api/v1/payments',
         headers={**user['headers'], 'Idempotency-Key': str(uuid4())}, body=body), (201,))
 
@@ -159,19 +172,18 @@ def normal_and_ownership():
     user, other = new_user(), new_user()
     mssv, ids = new_student(['2000000.00', '3000000.00'])
     assert request('payment', 'GET', '/api/v1/payments').status_code == 401
-    payment = create(user, mssv, [ids[0]])
-    assert Decimal(payment['total_amount']) == Decimal('2000000.00')
+    assert request('payment','POST','/api/v1/payments',headers=user['headers'] | {'Idempotency-Key':str(uuid4())},
+        body={'mssv':mssv,'selection_mode':'SELECTED','invoice_ids':[ids[0]],'terms_accepted':True}).status_code==422
+    payment = create(user, mssv)
+    assert Decimal(payment['total_amount']) == Decimal('5000000.00')
     assert request('payment', 'GET', '/api/v1/payments/' + payment['payment_id'], headers=other['headers']).status_code == 404
     verify(user, payment)
     assert check(process(user, payment))['status'] == 'SUCCEEDED'
     assert check(process(user, payment))['status'] == 'SUCCEEDED'
-    assert state(user)[0] == Decimal('8000000.00') and len(state(user)[1]) == 1
-    remaining = create(user, mssv)
-    assert [item['invoice_id'] for item in remaining['items']] == [ids[1]]
-    verify(user, remaining)
-    assert check(process(user, remaining))['status'] == 'SUCCEEDED'
-    assert state(user)[0] == Decimal('5000000.00')
-    record('JWT/ownership, selected invoice, ALL_UNPAID, repeat process')
+    assert state(user)[0] == Decimal('5000000.00') and len(state(user)[1]) == 1
+    assert request('payment','POST','/api/v1/payments',headers=user['headers'] | {'Idempotency-Key':str(uuid4())},
+        body={'mssv':mssv,'selection_mode':'ALL_UNPAID','terms_accepted':True}).status_code==409
+    record('JWT/ownership, ALL_UNPAID only, consent, repeat process, paid debt rejected')
 
 
 def competing_balance():
@@ -192,9 +204,8 @@ def competing_balance():
 
 def competing_invoices(overlap):
     users = [new_user(), new_user()]
-    mssv, ids = new_student(['2000000.00', '3000000.00', '4000000.00'])
-    selections = [ids[:2], ids[1:]] if overlap else [[ids[0]], [ids[0]]]
-    payments = [create(user, mssv, selected) for user, selected in zip(users, selections)]
+    mssv, ids = new_student(['2000000.00', '3000000.00', '4000000.00'] if overlap else ['2000000.00'])
+    payments = [create(user, mssv) for user in users]
     for user, payment in zip(users, payments):
         verify(user, payment)
     responses = parallel([lambda user=user, payment=payment: process(user, payment) for user, payment in zip(users, payments)])
@@ -209,10 +220,10 @@ def competing_invoices(overlap):
     with TuitionSession() as db:
         for invoice_id in ids:
             invoice = db.get(TuitionInvoice, invoice_id)
-            assert invoice.status == ('PAID' if invoice_id in selections[winner] else 'UNPAID')
+            assert invoice.status == 'PAID'
             if invoice.status == 'PAID':
                 assert invoice.paid_payment_id == payments[winner]['payment_id']
-    record('Overlapping invoice groups are all-or-nothing' if overlap else 'Two payers: same invoice is paid exactly once')
+    record('Competing full-debt groups settle all invoices atomically' if overlap else 'Two payers: same invoice is paid exactly once')
 
 
 def duplicate_requests():
@@ -322,7 +333,8 @@ def main():
         scenario()
     target = ROOT / 'artifacts/backend-acceptance.json'
     target.parent.mkdir(exist_ok=True)
-    target.write_text(json.dumps({'checked_at_utc': utcnow().isoformat() + 'Z', 'database': 'Docker localhost:14330',
+    target.write_text(json.dumps({'checked_at_utc': utcnow().isoformat() + 'Z', 'database': 'Docker localhost:' + ('14331' if PROFILE=='isolated' else '14330'),
+        'profile':PROFILE,
         'checks': report}, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'PASS: {len(report)} SQL Server acceptance scenarios; report: artifacts/backend-acceptance.json')
 

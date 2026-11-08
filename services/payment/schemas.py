@@ -3,26 +3,19 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_serializer, model_validator
 
 
 class PaymentCreate(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     mssv: str = Field(min_length=1, max_length=24)
-    selection_mode: Literal['SELECTED', 'ALL_UNPAID']
-    invoice_ids: list[int] = Field(default_factory=list, max_length=100)
+    selection_mode: Literal['ALL_UNPAID'] = 'ALL_UNPAID'
+    terms_accepted: StrictBool
 
     @model_validator(mode='after')
     def selection(self):
-        if self.selection_mode == 'ALL_UNPAID' and self.invoice_ids:
-            raise ValueError('ALL_UNPAID không nhận invoice_ids')
-        if self.selection_mode == 'SELECTED' and not self.invoice_ids:
-            raise ValueError('Chọn ít nhất một hóa đơn')
-        if any(value <= 0 or value > 2147483647 for value in self.invoice_ids):
-            raise ValueError('invoice_id không hợp lệ')
-        if len(set(self.invoice_ids)) != len(self.invoice_ids):
-            raise ValueError('invoice_ids không được trùng')
-        self.invoice_ids.sort()
+        if self.terms_accepted is not True:
+            raise ValueError('Cần đồng ý điều khoản thanh toán trước khi xác nhận giao dịch')
         return self
 
 
@@ -40,6 +33,7 @@ class OTPChallengeView(BaseModel):
     resend_after_seconds: int = 60
     demo_mode: bool = False
     delivery_address: str
+    email_delivery: Literal['smtp', 'not_configured'] = 'not_configured'
 
     @field_serializer('expires_at')
     def utc_dates(self, value):
@@ -52,6 +46,8 @@ class PaymentView(BaseModel):
     transaction_code: str
     payer_user_id: int
     account_id: int
+    payer_email: str
+    email_delivery: Literal['smtp', 'not_configured'] = 'not_configured'
     mssv: str
     student_name: str
     selection_mode: str
@@ -66,8 +62,10 @@ class PaymentView(BaseModel):
     completed_at: datetime | None
     receipt_status: Literal['PENDING', 'SENT'] | None
     active_challenge: OTPChallengeView | None
+    terms_version: str | None
+    terms_accepted_at: datetime | None
 
-    @field_serializer('created_at', 'updated_at', 'completed_at')
+    @field_serializer('created_at', 'updated_at', 'completed_at', 'terms_accepted_at')
     def utc_dates(self, value):
         return value.replace(tzinfo=timezone.utc).isoformat() if value else None
 

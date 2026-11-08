@@ -22,13 +22,15 @@ def enqueue_receipt(db, payment):
     if existing is None:
         subject, body = receipt_message(payment)
         db.add(EmailOutbox(id=str(uuid4()), payment_id=payment.payment_id, event_type='PAYMENT_SUCCEEDED',
-            recipient=payment.payer_email, subject=subject, body=body, status='PENDING', attempts=0))
+            recipient=payment.payer_email, email_channel=payment.email_channel,
+            subject=subject, body=body, status='PENDING', attempts=0))
 
 
 def dispatch_once(mailer=None):
     mailer = mailer or get_mailer()
     with SessionLocal() as db:
         ids = db.scalars(select(EmailOutbox.id).where(EmailOutbox.status == 'PENDING',
+            EmailOutbox.email_channel.in_(('configured', 'smtp')),
             or_(EmailOutbox.next_attempt_at.is_(None), EmailOutbox.next_attempt_at <= utcnow()))
             .order_by(EmailOutbox.created_at).limit(50)).all()
     delivered = 0
@@ -42,7 +44,8 @@ def dispatch_once(mailer=None):
                     continue
             # Closing the read session ends its transaction before opening SMTP.
             try:
-                mailer.send(recipient=row.recipient, subject=row.subject, body=row.body, message_id=row.id)
+                mailer.send(recipient=row.recipient, subject=row.subject, body=row.body,
+                    message_id=row.id, channel=row.email_channel)
             except MailError as error:
                 with SessionLocal.begin() as db:
                     pending = db.get(EmailOutbox, key)

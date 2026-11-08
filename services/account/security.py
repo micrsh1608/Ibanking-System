@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from pwdlib import PasswordHash
+from pwdlib.exceptions import UnknownHashError
 
 from shared.config import PROJECT_ROOT
 
@@ -30,7 +31,13 @@ DUMMY_HASH = password_hasher.hash("dummy-password-for-timing")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return password_hasher.verify(plain_password, hashed_password)
+    try:
+        return password_hasher.verify(plain_password, hashed_password)
+    except UnknownHashError:
+        # Unsupported/invalid legacy data must deny access, never a plaintext
+        # comparison or an unhandled login error. Keep a normal hash check cost.
+        password_hasher.verify(plain_password, DUMMY_HASH)
+        return False
 
 
 def create_access_token(user_id: int) -> str:

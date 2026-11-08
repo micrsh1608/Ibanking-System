@@ -9,6 +9,7 @@ x-acceptance: &acceptance
     SMTP_SSL: "false"
     SMTP_STARTTLS: "false"
     SMTP_FROM: ibanking@example.test
+    MAILPIT_WEB_URL: http://127.0.0.1:8026
 
 services:
   sqlserver:
@@ -17,6 +18,9 @@ services:
     ports: !override ["127.0.0.1:14331:1433"]
   db-init:
     <<: *acceptance
+    environment:
+      <<: *smtp
+      IBANKING_SEED_DEMO: "true"
   account:
     <<: *acceptance
     ports: !override ["127.0.0.1:8101:8001"]

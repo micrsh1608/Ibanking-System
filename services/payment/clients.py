@@ -2,6 +2,7 @@
 import os
 
 import httpx
+from shared.observability import tracing_headers
 
 
 class UpstreamError(Exception):
@@ -16,6 +17,7 @@ class Services:
         base = os.getenv(f'{service.upper()}_SERVICE_URL',
             'http://127.0.0.1:8001' if service == 'account' else 'http://127.0.0.1:8003')
         headers = {'Authorization': f'Bearer {token}'} if token else {'X-Internal-Key': os.environ['INTERNAL_API_KEY']}
+        headers.update(tracing_headers())
         try:
             with httpx.Client(timeout=httpx.Timeout(10, connect=3), trust_env=False) as client:
                 response = client.request(method, base + path, headers=headers, json=body)
@@ -41,7 +43,8 @@ class Services:
         return self.request('tuition', 'POST', '/internal/tuition/reservations', body={
             'payment_id': payment.payment_id, 'mssv': payment.mssv,
             'items': [{'invoice_id': item.invoice_id, 'version': item.invoice_version} for item in payment.items],
-            'expected_total': format(payment.total_amount, '.2f')})
+            'expected_total': format(payment.total_amount, '.2f'),
+            'require_all_unpaid': payment.selection_mode == 'ALL_UNPAID'})
 
     def reservation(self, payment_id, action=None):
         path = f'/internal/tuition/reservations/{payment_id}'

@@ -1,21 +1,71 @@
-# REST API — phiên bản hoàn thành 02–06/11/2026
+# REST API — thanh toán toàn bộ, email đã xác minh và OTP, cập nhật 07/11/2026
 
 Ba service độc lập, mỗi service có `/docs` và `/openapi.json`.
 Money dùng chuỗi thập phân; ngày giờ Payment trả ISO 8601 UTC.
 JWT: `Authorization: Bearer <token>`. API nội bộ: `X-Internal-Key`.
+Mọi response có `X-Request-ID` UUID để đối chiếu; client có thể gửi UUID hợp lệ
+để gateway và các cuộc gọi REST giữ cùng mã. Xem [truy vết](observability.md).
 
 ## Account — cổng 8001
 
 | Method/URI | Input | Auth | Output | HTTP lỗi chính |
 |---|---|---|---|---|
 | `POST /auth/login` | `{username,password}` | Không | 200 `{access_token,token_type}` | 401, 403, 422 |
-| `GET /users/me` | Không | JWT | 200 `{id,username,full_name,identity_number,email,phone}` | 401, 403 |
+| `GET /users/me` | Không | JWT | 200 UserResponse gồm hồ sơ, trạng thái email và yêu cầu xác minh chờ | 401, 403 |
+| `PUT /users/me` | ProfileUpdate | JWT + mật khẩu hiện tại | 202 UserResponse; lưu bản nháp và gửi mã, hồ sơ đang dùng chưa thay đổi | 401, 403, 409, 422, 429, 503 |
+| `POST /users/me/email-verification/confirm` | `{challenge_id,code}` | JWT | 200 UserResponse sau khi xác minh và lưu | 400 sai/hết hạn, 401, 403, 409 đã dùng/sai chủ, 422, 429 |
+| `POST /users/me/email-verification/resend` | `{current_password}` | JWT | 202 UserResponse có challenge mới | 401, 403, 409, 422, 429, 503 |
+| `DELETE /users/me/email-verification` | Không | JWT | 200, hủy yêu cầu chờ, giữ hồ sơ hiện tại | 401, 403, 409 |
+| `GET /app-config` | Không | Không | 200 `{email_delivery:smtp/not_configured,account_email_routing:true}` | Không chứa thông tin đăng nhập SMTP |
 | `GET /accounts/me` | Không | JWT | 200 `{id,account_number,balance,status}` | 401, 403, 404 |
 | `POST /internal/accounts/debit` | DebitRequest | Internal | 200 Operation | 401, 403 sai chủ, 404, 409 số dư/khóa/dữ liệu, 422, 503 |
 | `POST /internal/accounts/refund` | `{payment_id}` | Internal | 200 Operation | 401, 404, 409, 422, 503 |
 | `POST /internal/accounts/cancel` | DebitRequest | Internal | 200 Operation | 401, 403, 404, 409 sai dữ liệu, 422, 503 |
 | `GET /internal/account-operations/{payment_id}` | UUID | Internal | 200 Operation | 401, 404, 422, 503 |
 | `GET /health`, `GET /health/db` | Không | Không | 200 trạng thái app/DB | 503 với DB |
+
+Login trim khoảng trắng đầu/cuối và không phân biệt hoa/thường ở username,
+không phụ thuộc collation của database. Mật khẩu giữ nguyên từng ký tự, kể cả
+khoảng trắng. Username không tồn tại, mật khẩu sai hoặc hash lưu không được hỗ
+trợ đều trả cùng lỗi 401, không cấp token. Người dùng bị vô hiệu hóa trả 403.
+JWT có sub/iat/exp/iss/aud; Account xác thực chữ ký, hạn và trạng thái user khi
+đọc/cập nhật `/me`. UI chỉ hiện tài khoản sau khi lấy đủ hồ sơ và số dư.
+Khi lưu hồ sơ gặp 401, xóa phiên và yêu cầu đăng nhập; 403 được kiểm tra lại với
+Account để phân biệt user bị vô hiệu hóa với sai mật khẩu xác nhận.
+
+Không có API đăng ký tài khoản mới. `POST /auth/register` trả 404; dùng tài
+khoản được cấp hoặc seed demo. Hồ sơ/số dư/lịch sử đã có được giữ nguyên.
+ProfileUpdate ví dụ:
+
+```json
+{"current_password":"YourPassword_123!","full_name":"Nguyễn Minh An","email":"your-address@example.com","phone":"0900000001","identity_number":"000000000001"}
+```
+
+ProfileUpdate gồm `full_name`, `email`, `phone`, `identity_number` như trên và
+`current_password`. PUT thay các trường hồ sơ có thể sửa của **chủ JWT**, không
+nhận username/user ID/account number/balance/status; trường lạ trả 422.
+Mật khẩu xác nhận sai trả 403, không lưu thay đổi. Không trả password/hash.
+Mọi PUT hợp lệ chỉ lưu bản nháp và gửi mã đến email được nhập trong yêu cầu;
+trả 202, kể cả chỉ sửa tên/điện thoại và giữ nguyên email đã xác minh.
+Email/họ tên/điện thoại/CCCD đang dùng chưa thay đổi.
+Confirm đúng mã mới lưu cả hồ sơ và email_verified_at trong cùng transaction.
+UserResponse có `email_verified`, `email_delivery` (`smtp` hoặc `not_configured`),
+`pending_email`, `email_verification` (UUID,
+expires_at UTC, thời gian chờ gửi lại, địa chỉ che bớt). Không trả hash hoặc mã rõ.
+Mã 6 số, 5 phút, 5 lần sai, một lần sử dụng; gửi lại sau 60 giây thay mã/challenge.
+Đã có email được xác minh thì địa chỉ đó vẫn hoạt động trong khi chờ địa chỉ khác.
+
+Payment yêu cầu `email_verified=true` khi tạo giao dịch và kiểm tra lại khi
+gửi/xác minh OTP hoặc bắt đầu process. Email hiện tại phải trùng snapshot;
+nếu đã đổi sang email mới, tạo payment mới thay vì gửi đến địa chỉ cũ. Lịch sử
+hoàn tất giữ nguyên; giao dịch đã PROCESSING/đối soát tiếp tục khôi phục tài chính.
+Xem [luồng xác minh email](email-verification.md).
+
+`GET /app-config` chỉ báo chế độ gửi thư; không lộ SMTP host, user hoặc password.
+Ứng dụng chính chỉ dùng SMTP thật. `SMTP_USERNAME`/`SMTP_FROM` cấu hình người
+gửi; người nhận lấy từ email của chính user, không được thay bằng địa chỉ SMTP.
+Migration `20261107_smtp_only_accounts` chuyển route cũ sang SMTP, yêu cầu các
+tài khoản từng xác minh qua Mailpit chứng minh lại hộp thư thật. Không tự gửi thư.
 
 DebitRequest:
 
@@ -41,8 +91,8 @@ Trả 200, hoặc 401/404/422. `/health` và `/health/db` không yêu cầu JWT.
 
 ```json
 {
-  "mssv": "SV2026001",
-  "full_name": "Sinh viên Demo",
+  "mssv": "SV20261013",
+  "full_name": "Lê Minh Khang",
   "total_unpaid": "5000000.00",
   "invoices": [
     {"id": 1, "semester": "2026-2027-HK1", "amount_due": "2000000.00", "status": "UNPAID", "version": 1},
@@ -71,7 +121,7 @@ ReserveRequest:
 ```json
 {
   "payment_id": "11111111-1111-4111-8111-111111111111",
-  "mssv": "SV2026001",
+  "mssv": "SV20261013",
   "items": [{"invoice_id": 1, "version": 1}, {"invoice_id": 2, "version": 1}],
   "expected_total": "5000000.00"
 }
@@ -102,23 +152,22 @@ Không tìm thấy và không thuộc chủ đều trả 404. Các endpoint prot
 | `POST /api/v1/payments/{payment_id}/process` | Không | 200 SUCCEEDED; 202 đang xử lý/đối soát; 409 FAILED/REFUNDED | 401, 404, 409 chưa xác minh/OTP hết hạn, 422, 503 DB |
 | `GET /`, `GET /health`, `GET /health/db` | Không | 200 thông tin/trạng thái | 503 với DB |
 
-PaymentCreate cho một hóa đơn hoặc một nhóm tự chọn:
+PaymentCreate: toàn bộ hóa đơn UNPAID của MSSV và đồng ý điều khoản:
 
 ```json
-{"mssv": "SV2026001", "selection_mode": "SELECTED", "invoice_ids": [1]}
+{"mssv": "SV20261013", "selection_mode": "ALL_UNPAID", "terms_accepted": true}
 ```
 
-Toàn bộ hóa đơn UNPAID tại thời điểm tạo giao dịch:
-
-```json
-{"mssv": "SV2026001", "selection_mode": "ALL_UNPAID"}
-```
-
-Không được gửi thêm `payer_id`, `payer_user_id`, `account_id`, `amount` hoặc trường
-khác. SELECTED cần 1–100 ID không trùng; ALL_UNPAID không nhận ID. Backend lấy
+Không được gửi thêm `payer_id`, `payer_user_id`, `account_id`, `amount`, `invoice_ids`
+hoặc trường khác. `SELECTED` đã bỏ và trả 422. `terms_accepted` bắt buộc là boolean
+true; thiếu/false/chuỗi/số đều trả 422. Backend lấy
 người trả/tài khoản từ Account bằng JWT, MSSV/hóa đơn/tiền từ Tuition qua REST.
-Không tự thêm hóa đơn mới vào giao dịch đã tạo. Hết hóa đơn có thể trả hoặc tổng
-vượt giới hạn NUMERIC(18,2) trả 409. Không giữ tiền hoặc hóa đơn ở bước tạo snapshot.
+Trước khi tạo, kiểm tra họ tên/điện thoại/email người trả hợp lệ, account ACTIVE,
+có 1–100 hóa đơn UNPAID, không có hóa đơn RESERVED và số dư >= tổng tiền; sai điều
+kiện trả 409, không tạo payment. MSSV không tồn tại trả 404.
+Không tự thêm hóa đơn mới vào giao dịch đã tạo. Khi giữ hóa đơn, Tuition khóa
+toàn bộ tập hóa đơn của MSSV và yêu cầu tập UNPAID khớp snapshot; nếu công nợ đổi,
+trả 409 để người dùng xác nhận lại toàn bộ. Không giữ tiền ở bước tạo snapshot.
 
 PaymentView ví dụ:
 
@@ -128,13 +177,15 @@ PaymentView ví dụ:
   "transaction_code": "TXN-11111111111141118111111111111111",
   "payer_user_id": 1,
   "account_id": 1,
-  "mssv": "SV2026001",
-  "student_name": "Sinh viên Demo",
-  "selection_mode": "SELECTED",
-  "total_amount": "2000000.00",
+  "mssv": "SV20261013",
+  "student_name": "Lê Minh Khang",
+  "selection_mode": "ALL_UNPAID",
+  "total_amount": "5000000.00",
+  "terms_version": "2026-11-03",
+  "terms_accepted_at": "2026-11-03T15:00:00+00:00",
   "status": "PENDING_OTP",
   "phase": "RESERVE",
-  "items": [{"invoice_id": 1, "invoice_version": 1, "semester": "2026-2027-HK1", "amount": "2000000.00"}],
+  "items": [{"invoice_id": 1, "invoice_version": 1, "semester": "2026-2027-HK1", "amount": "2000000.00"}, {"invoice_id": 2, "invoice_version": 1, "semester": "2026-2027-HK2", "amount": "3000000.00"}],
   "error_message": null,
   "retry_count": 0,
   "created_at": "2026-11-02T05:00:00+00:00",
@@ -148,14 +199,26 @@ trả 409; nếu request cùng key đang khởi tạo, thử lại sau bằng ke
 
 ## Email và OTP
 
-OTP được gửi bằng SMTP đến email snapshot của người đang đăng nhập. Docker mặc
-định gửi vào Mailpit; SMTP thật có SSL/STARTTLS và login qua biến môi trường.
+OTP được gửi bằng SMTP thật đến email đã xác minh được chụp trong snapshot
+của người đang đăng nhập. SSL/STARTTLS và login cấu hình qua biến môi trường;
+tài khoản SMTP gửi thư không quyết định địa chỉ nhận. Sau khi xác minh email
+hồ sơ mới, giao dịch mới lấy địa chỉ mới; bản nháp dùng địa chỉ cũ cần hủy và tạo lại.
 Không in OTP vào log, không trả mã OTP trong JSON và không lưu mã rõ trong DB.
+Giao diện tự gọi send-otp sau khi xác nhận tạo giao dịch thành công; nếu gửi lỗi,
+người dùng thử lại nút Gửi mã trên cùng UUID, không tạo khoản thanh toán mới.
 
 Mã sáu chữ số được HMAC với UUID, challenge, danh sách/phiên bản hóa đơn và tổng tiền;
 hạn 5 phút, tối đa 5 lần sai, gửi lại sau 60 giây. Gửi lại hủy xác minh cũ. Xác minh
 thành công tiêu thụ mã; process phải bắt đầu trước khi xác minh hết hạn. Giao dịch
 đã nhận xử lý tiếp tục được phục hồi dù OTP hết hạn sau đó.
+
+Mã còn hiệu lực không trùng với mã của giao dịch khác. Bộ cấp mã khóa transaction
+toàn hệ thống Payment trong SQL Server, kiểm tra dấu vân tay HMAC của mã và sinh
+lại khi trùng; filtered unique index `uq_payments_otp_fingerprint` bảo vệ ở DB.
+Không trả dấu vân tay qua API. Chỗ dành mã được giữ đến hạn gốc, kể cả mã đã dùng;
+mã hết hạn được giải phóng ở lần cấp tiếp theo. Gửi lại cũng không dùng mã trước
+của chính giao dịch. Tối đa 128 lượt sinh mã, sau đó trả 503 để thử lại, không gửi
+thư hoặc ghi challenge dở dang.
 
 SMTP lỗi trả 503, làm mất hiệu lực challenge vừa cấp và cho phép thử gửi lại.
 PaymentView có `active_challenge` (cùng metadata như response send-otp, không có
@@ -172,6 +235,11 @@ SMTP là cơ chế gửi ít nhất một lần: nếu server đã nhận thư n
 Payment dừng trước khi lưu SENT, có thể có thư trùng. UUID sự kiện/Message-ID cố
 định giúp đối chiếu; ràng buộc duy nhất giữ một sự kiện biên nhận cho mỗi payment.
 Không có đảm bảo gửi email đúng một lần chỉ bằng SMTP.
+
+Harness acceptance cũ dựa trên Mailpit chưa được chuyển đổi hoặc chạy lại cho
+bản SMTP-only này. Phạm vi kiểm chứng hiện tại gồm unit test bằng SMTP giả lập,
+API đang chạy và kết nối/xác thực SMTP; không gửi thư thử thật hoặc thực hiện
+thanh toán thật. Bằng chứng acceptance lịch sử giữ nguyên ngày và phạm vi cũ.
 
 ## Gateway cho giao diện
 

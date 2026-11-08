@@ -12,6 +12,7 @@ from services.payment.database import engine
 from services.payment.recovery import run
 from services.payment.routes import router
 from services.payment.outbox import run as run_mail
+from shared.observability import RequestContextMiddleware
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ async def lifespan(app):
 
 app = FastAPI(title='Payment Service', version='0.2.0', lifespan=lifespan)
 app.include_router(router)
+app.add_middleware(RequestContextMiddleware, service='payment')
 
 
 @app.exception_handler(UpstreamError)

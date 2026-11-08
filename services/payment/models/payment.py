@@ -1,10 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Unicode, UnicodeText, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Unicode, UnicodeText, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from services.payment.database import Base
+from shared.mailer import resolve_email_channel
 from shared.time import utcnow
 
 
@@ -13,6 +14,8 @@ class PaymentTransaction(Base):
     __table_args__ = (
         CheckConstraint('total_amount > 0', name='ck_payment_total'),
         CheckConstraint("status IN ('PENDING_OTP','OTP_VERIFIED','PROCESSING','PENDING_RECONCILIATION','SUCCEEDED','FAILED','REFUNDED')", name='ck_payment_status'),
+        Index('uq_payments_otp_fingerprint', 'otp_fingerprint', unique=True,
+            mssql_where=text('otp_fingerprint IS NOT NULL'), sqlite_where=text('otp_fingerprint IS NOT NULL')),
     )
 
     payment_id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -22,9 +25,12 @@ class PaymentTransaction(Base):
     account_id: Mapped[int] = mapped_column(BigInteger)
     payer_name: Mapped[str] = mapped_column(Unicode(150))
     payer_email: Mapped[str] = mapped_column(String(255))
+    email_channel: Mapped[str] = mapped_column(String(12), default='smtp', server_default='smtp')
     mssv: Mapped[str] = mapped_column(String(24))
     student_name: Mapped[str] = mapped_column(Unicode(150))
     selection_mode: Mapped[str] = mapped_column(String(16))
+    terms_version: Mapped[str | None] = mapped_column(String(32))
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))
     status: Mapped[str] = mapped_column(String(32), default='PENDING_OTP', index=True)
     phase: Mapped[str] = mapped_column(String(16), default='RESERVE')
@@ -33,6 +39,7 @@ class PaymentTransaction(Base):
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     challenge_id: Mapped[str | None] = mapped_column(String(36))
     otp_hash: Mapped[str | None] = mapped_column(String(64))
+    otp_fingerprint: Mapped[str | None] = mapped_column(String(64))
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     otp_last_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     otp_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -42,6 +49,10 @@ class PaymentTransaction(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     items: Mapped[list['PaymentItem']] = relationship(back_populates='payment', order_by='PaymentItem.invoice_id', lazy='selectin')
     notifications: Mapped[list['EmailOutbox']] = relationship(lazy='selectin')
+
+    @property
+    def email_delivery(self):
+        return resolve_email_channel(self.email_channel or 'configured')
 
     @property
     def receipt_status(self):
@@ -55,6 +66,7 @@ class PaymentTransaction(Base):
         cooldown = max(0, 60 - int((utcnow() - self.otp_last_sent_at).total_seconds())) if self.otp_last_sent_at else 0
         return {'challenge_id': self.challenge_id, 'expires_at': self.otp_expires_at,
             'resend_after_seconds': cooldown, 'demo_mode': False,
+            'email_delivery': self.email_delivery,
             'delivery_address': (local[:1] + '***@' + domain) if domain else 'email đã đăng ký'}
 
 
@@ -85,6 +97,7 @@ class EmailOutbox(Base):
     payment_id: Mapped[str] = mapped_column(ForeignKey('payments.payment_id'), index=True)
     event_type: Mapped[str] = mapped_column(String(32))
     recipient: Mapped[str] = mapped_column(String(255))
+    email_channel: Mapped[str] = mapped_column(String(12), default='smtp', server_default='smtp')
     subject: Mapped[str] = mapped_column(Unicode(255))
     body: Mapped[str] = mapped_column(UnicodeText)
     status: Mapped[str] = mapped_column(String(12), default='PENDING')

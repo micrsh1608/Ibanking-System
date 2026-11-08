@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import statistics
+import sys
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -132,7 +133,7 @@ def clean_install():
         assert account.balance == Decimal('10000000.00')
         account_id = account.id
     with a.TuitionSession() as db:
-        student = db.scalar(select(Student).where(Student.mssv == 'SV2026001'))
+        student = db.scalar(select(Student).where(Student.mssv == 'SV20261013'))
         invoices = db.scalars(select(TuitionInvoice).where(TuitionInvoice.student_id == student.id).order_by(TuitionInvoice.id)).all()
         assert len(invoices) == 2 and all(row.status == 'UNPAID' for row in invoices)
         ids = [row.id for row in invoices]
@@ -140,10 +141,11 @@ def clean_install():
         assert db.scalar(select(func.count()).select_from(PaymentTransaction)) == 0
     token = a.check(a.request('account', 'POST', '/auth/login', body={'username': 'huy', 'password': 'HuyDemo_123!'}))['access_token']
     actor = {'headers': {'Authorization': 'Bearer ' + token}, 'user_id': user.id,
-        'account_id': account_id, 'email': user.email}
+        'account_id': account_id, 'email': user.email, 'password': 'HuyDemo_123!'}
+    a.verify_email(actor)
     payments = []
-    for selection in ([ids[0]], None):
-        payment = a.create(actor, 'SV2026001', selection)
+    for mssv in ['SV20261013']:
+        payment = a.create(actor, mssv)
         a.verify(actor, payment)
         assert a.check(a.process(actor, payment), (200, 202))['status'] in {'SUCCEEDED', 'PROCESSING', 'PENDING_RECONCILIATION'}
         assert settle(actor, payment)['status'] == 'SUCCEEDED'
@@ -156,7 +158,7 @@ def clean_install():
     with a.TuitionSession() as db:
         assert all(db.get(TuitionInvoice, key).status == 'PAID' for key in ids)
     check('Clean installation and 5-10 minute demo rehearsal', {'new_volumes': True,
-        'selected_and_all_unpaid': True, 'otp_and_receipts_smtp': True,
+        'all_unpaid_and_terms': True, 'otp_and_receipts_smtp': True,
         'seed_repeat_kept_balance_and_paid_status': True, 'payment_ids': payments})
 
 
@@ -289,6 +291,7 @@ def sql_crash_in_transaction():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cached-build', action='store_true')
+    parser.add_argument('--full-checks', action='store_true', help='Also run SQL concurrency and browser acceptance in this isolated stack')
     parser.add_argument('--workers', type=int, default=16, choices=range(1, 33))
     parser.add_argument('--payments', type=int, default=32, choices=range(4, 65))
     args = parser.parse_args()
@@ -299,6 +302,27 @@ def main():
         command(['build'] + ([] if args.cached_build else ['--no-cache']) + ['db-init'], name='image-build')
         command(['up', '--no-build', '--wait', '--wait-timeout', '300'], name='clean-start')
         clean_install()
+        if args.full_checks:
+            result=subprocess.run([sys.executable,'-m','tests.integration.backend_acceptance'],cwd=ROOT,capture_output=True,text=True,encoding='utf8',errors='replace')
+            (OUTPUT/'backend-checks.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+            if result.returncode: raise RuntimeError('SQL backend acceptance failed; see backend-checks.log')
+            report['backend_checks']='PASS'
+            print('PASS: isolated SQL concurrency acceptance',flush=True)
+            result=subprocess.run([sys.executable,'-m','tests.integration.otp_consistency_acceptance'],cwd=ROOT,capture_output=True,text=True,encoding='utf8',errors='replace')
+            (OUTPUT/'otp-consistency-checks.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+            if result.returncode:raise RuntimeError('OTP/consistency acceptance failed; see otp-consistency-checks.log')
+            report['otp_consistency_checks']='PASS'
+            print('PASS: isolated OTP and successful-payment consistency acceptance',flush=True)
+            result=subprocess.run([sys.executable,'-m','tests.integration.email_verification_acceptance'],cwd=ROOT,capture_output=True,text=True,encoding='utf8',errors='replace')
+            (OUTPUT/'email-verification-checks.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+            if result.returncode:raise RuntimeError('Email verification acceptance failed; see email-verification-checks.log')
+            report['email_verification_checks']='PASS'
+            print('PASS: isolated email ownership verification acceptance',flush=True)
+            result=subprocess.run([sys.executable,'-m','tests.integration.observability_acceptance'],cwd=ROOT,capture_output=True,text=True,encoding='utf8',errors='replace')
+            (OUTPUT/'observability-checks.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+            if result.returncode:raise RuntimeError('Observability acceptance failed; see observability-checks.log')
+            report['observability_checks']='PASS'
+            print('PASS: isolated gateway and three-service request tracing',flush=True)
         load(args.workers, args.payments)
         lost_commit_reply('account')
         lost_commit_reply('tuition')
@@ -306,6 +330,13 @@ def main():
         payment_crash_after_debit()
         sql_crash_in_transaction()
         wait_for(healthy)
+        if args.full_checks:
+            browser_env=os.environ.copy(); browser_env['IBANKING_E2E_BASE_URL']='http://127.0.0.1:8101'
+            result=subprocess.run(['npm.cmd' if os.name=='nt' else 'npm','run','test:e2e'],cwd=ROOT,env=browser_env,capture_output=True,text=True,encoding='utf8',errors='replace')
+            (OUTPUT/'browser-checks.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+            if result.returncode: raise RuntimeError('Browser acceptance failed; see browser-checks.log')
+            report['browser_checks']='PASS'
+            print('PASS: isolated browser acceptance',flush=True)
         report['status'] = 'PASS'
         report['image_id'] = subprocess.run(['docker', 'image', 'inspect', '--format', '{{.Id}}', os.environ['IBANKING_TEST_IMAGE']], capture_output=True, text=True, check=True).stdout.strip()
     except Exception as error:

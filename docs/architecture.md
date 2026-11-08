@@ -1,6 +1,6 @@
 # Kiến trúc và phân tích nghiệp vụ — mốc hoàn thành 08/11
 
-Cập nhật ngày 02/11/2026: đã hoàn thành sớm phần việc 02–08/11, gồm backend,
+Cập nhật ngày 05/11/2026 theo đề bài và rubric: đã hoàn thiện phần việc 02–08/11, gồm backend,
 SMTP/outbox, UI, tải và lỗi hạ tầng. Sơ đồ mô tả mã đã chạy và kiểm thử;
 bản hình xuất ở `docs/diagrams/exported`, nguồn có thể sửa nằm trong PPTX bàn giao.
 
@@ -22,6 +22,7 @@ flowchart LR
     Worker -->|REST retry cùng UUID| Account
     Worker -->|REST retry cùng UUID| Tuition
     Payment -->|Gửi OTP qua SMTP| Mail[Mailpit hoặc SMTP thật]
+    Account -->|Xác minh email hồ sơ| Mail
     MailWorker[Worker email trong Payment] --> PDB
     MailWorker -->|Biên nhận từ outbox| Mail
 ```
@@ -49,21 +50,28 @@ nhiều guard giữ kết nối và transaction ngắn không còn kết nối �
 
 Nguồn UML chuẩn: [use-cases.puml](diagrams/use-cases.puml).
 Người trả là chủ tài khoản đã đăng nhập; sinh viên theo MSSV có thể là người khác.
-Chức năng ghi/sửa hồ sơ và tài khoản nằm ngoài phân hệ học phí.
+Account đăng nhập bằng tài khoản được cấp và cập nhật hồ sơ với mật khẩu xác
+nhận. Không hiện thực đăng ký tài khoản mới theo phạm vi đề bài. Không cho
+client sửa username, số tài khoản hoặc số dư.
+Phần người trả trên trang thanh toán vẫn chỉ đọc; OTP dùng email snapshot.
 
 | Use Case | Điều kiện và luồng chính | Kết quả / luồng lỗi |
 |---|---|---|
 | UC01 Đăng nhập | Username/password hợp lệ, người dùng active | JWT có subject, issuer, audience và hạn; sai thông tin trả 401/403 |
 | UC02 Tra MSSV | JWT hợp lệ; đọc tên sinh viên, các kỳ, tiền và trạng thái | Không có MSSV trả 404; RESERVED hiển thị đang xử lý |
-| UC03 Chọn học phí | Chọn một/nhiều hóa đơn hoặc ALL_UNPAID | Server chốt hóa đơn/phiên bản/tổng; không nhận tiền hay người trả do client cung cấp |
-| UC04 Xác minh OTP | Xác nhận snapshot rồi yêu cầu challenge | SMTP gửi mã một lần, 5 phút, 5 lần sai; resend hủy mã/xác minh cũ |
+| UC03 Xác nhận toàn bộ công nợ | Tự tra MSSV, xem toàn bộ hóa đơn chưa đóng, đủ hồ sơ/số dư và đồng ý điều khoản | Chỉ ALL_UNPAID; server chốt hóa đơn/phiên bản/tổng, không nhận ID hóa đơn/tiền/người trả từ client |
+| UC04 Xác minh OTP | Xác nhận snapshot, UI tự yêu cầu challenge | SMTP gửi mã khác các mã còn hiệu lực, dùng một lần, 5 phút, 5 lần sai; resend hủy mã/xác minh cũ |
 | UC05 Thanh toán | Đúng chủ, OTP còn hạn, chưa xử lý | Giữ toàn bộ nhóm → debit đúng tổng → hoàn tất; không được trả một phần nhóm |
 | UC06 Tra kết quả/lịch sử | JWT và đúng chủ | Trả UUID/status/phase/items; timeout hướng dẫn tra cứu mã cũ |
 | UC07 Đăng xuất | Phiên trình duyệt đang mở | UI xóa JWT trong RAM; chưa thu hồi JWT trung tâm |
+| UC08 Cập nhật hồ sơ | JWT, mật khẩu hiện tại, dữ liệu hợp lệ | Giữ email đã xác minh thì lưu ngay; đổi email tạo bản chờ |
+| UC09 Xác minh email | Mã gửi tới địa chỉ chờ, gắn user/challenge, hạn 5 phút | Đúng mã lưu hồ sơ và email_verified_at nguyên tử; sai/hết hạn không đổi email đang dùng |
 
 Tiền dùng Decimal/NUMERIC(18,2). Mỗi sinh viên hiện có một hóa đơn cho mỗi học kỳ,
 ràng buộc UNIQUE(student_id, semester). Một giao dịch có 1–100 hóa đơn. ALL_UNPAID
-chốt công nợ có thể trả tại thời điểm tạo, không tự bổ sung hóa đơn được phát hành sau đó.
+chốt toàn bộ công nợ tại thời điểm tạo, không tự bổ sung hóa đơn sau xác nhận.
+Khi reserve, Tuition khóa tập hóa đơn của sinh viên và từ chối nếu tập UNPAID
+đã thay đổi hoặc có khoản đang RESERVED; phải tra cứu/xác nhận lại để trả đủ.
 
 ## ERD đã triển khai
 
@@ -91,6 +99,14 @@ erDiagram
         string email
         string phone
         boolean is_active
+        datetime email_verified_at
+        string pending_email
+        uuid email_challenge_id
+        string email_code_hash
+        datetime email_code_expires_at
+        datetime email_code_sent_at
+        int email_code_attempts
+        string email_pending_profile
     }
     accounts {
         bigint id PK
@@ -150,6 +166,8 @@ erDiagram
         string mssv
         string student_name
         string selection_mode
+        string terms_version
+        datetime terms_accepted_at
         decimal total_amount
         string status
         string phase
@@ -157,6 +175,7 @@ erDiagram
         datetime next_retry_at
         uuid challenge_id
         string otp_hash
+        string otp_fingerprint
         datetime otp_expires_at
         datetime otp_verified_at
         datetime completed_at
@@ -197,7 +216,7 @@ sequenceDiagram
     participant T as Tuition
     participant A as Account
     participant W as Worker Payment
-    U->>P: POST create (JWT, Idempotency-Key, MSSV, chế độ chọn)
+    U->>P: POST create (JWT, Idempotency-Key, MSSV, đồng ý điều khoản)
     P->>A: users/me và accounts/me bằng JWT
     P->>T: Snapshot hóa đơn
     P-->>U: UUID, danh sách, tổng tiền
@@ -238,6 +257,12 @@ mới kết thúc FAILED/REFUNDED. Không tự nhả hóa đơn đang xử lý c
 
 Worker email đọc outbox và gửi SMTP ngoài transaction, retry không gọi lại thanh
 toán. Message-ID cố định, một sự kiện/payment; SMTP có thể gửi trùng khi mất ACK.
-UI tra MSSV, chọn hóa đơn, OTP, kết quả và lịch sử qua gateway Account. Chỉ UUID/
+UI tra MSSV, xác nhận toàn bộ công nợ, OTP, kết quả và lịch sử qua gateway Account. Chỉ UUID/
 user ID được lưu tạm để phục hồi; token và OTP nằm trong bộ nhớ. Xem
-[bàn giao UI/email](ui-email-delivery.md).
+[bàn giao UI/email](email-verification.md).
+
+Ba service và gateway/REST client truyền `X-Request-ID`; middleware ghi log JSON
+với route mẫu, status và thời gian, không ghi body/query/JWT/OTP/email. Worker
+phục hồi dùng context riêng và nối giao dịch bằng payment_id. Xem
+[hướng dẫn truy vết](observability.md). Các ERD tổng quan lược bớt cột thời gian
+và trạng thái phụ; model/migration là schema đầy đủ.

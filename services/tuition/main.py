@@ -5,10 +5,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from services.tuition.database import engine
 from services.tuition.routes import router
 from services.tuition.internal_routes import router as internal_router
+from shared.observability import RequestContextMiddleware
 
 app = FastAPI(title='Tuition Service', version='0.1.0')
 app.include_router(router)
 app.include_router(internal_router)
+app.add_middleware(RequestContextMiddleware, service='tuition')
 
 
 @app.get('/health')
