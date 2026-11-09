@@ -6,10 +6,18 @@ Dự án giữa kỳ môn **Kiến trúc hướng dịch vụ**, Nhóm 12. Hệ 
 
 ## Chạy nhanh
 
-Sau khi đã cài Docker Desktop và chuẩn bị `infra/env/docker.env` (xem [mục 2](#2-cài-đặt-và-chạy-lần-đầu)), mở PowerShell tại thư mục dự án và chạy:
+Sau khi đã cài Docker Desktop và chuẩn bị `infra/env/docker.env` (xem [mục 2](#2-cài-đặt-và-chạy-lần-đầu)), mở terminal tại thư mục dự án và chạy:
+
+Windows (PowerShell):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+macOS (Terminal, cần cài PowerShell 7 — xem [Chạy trên macOS](#chạy-trên-macos)):
+
+```bash
+pwsh ./start.ps1
 ```
 
 Lệnh khởi động toàn bộ hệ thống và hiện log ngay trong terminal; nhấn **Ctrl+C** để dừng. Mở Web tại [http://127.0.0.1:8001/ui/](http://127.0.0.1:8001/ui/). Thêm `-Detached` để chạy nền, thêm `-PrepareDemo` để tạo dữ liệu demo ở lần chạy đầu.
@@ -62,13 +70,13 @@ Ba database nằm trên cùng SQL Server trong bản Docker demo. Mỗi service 
 
 ### Yêu cầu
 
-- Windows và PowerShell để sử dụng các script `.ps1` đi kèm.
+- Windows có sẵn PowerShell, hoặc macOS đã cài PowerShell 7 (xem [Chạy trên macOS](#chạy-trên-macos)) để dùng các script `.ps1` đi kèm.
 - Docker Desktop hoạt động ở chế độ **Linux containers**.
 - Internet cho lần tải image và dependency đầu tiên.
 - Tài khoản SMTP thật có thông số máy chủ và quyền gửi thư.
-- SQL Server Management Studio (SSMS), nếu muốn xem database trực tiếp.
+- Công cụ xem database nếu cần: SQL Server Management Studio (SSMS) trên Windows; VS Code với tiện ích SQL Server (mssql) hoặc DBeaver trên macOS.
 
-Chạy bằng Docker không yêu cầu cài Python, Node.js hoặc SQL Server riêng trên Windows. Python/Node.js chỉ cần khi phát triển hoặc kiểm thử ngoài container.
+Chạy bằng Docker không yêu cầu cài Python, Node.js hoặc SQL Server riêng trên máy. Python/Node.js chỉ cần khi phát triển hoặc kiểm thử ngoài container.
 
 ### Bước 1 — Mở PowerShell tại thư mục dự án
 
@@ -141,6 +149,51 @@ Script khởi động SQL Server, chạy `db-init` để tạo/migrate database,
 | SQL Server trong SSMS | `127.0.0.1,14330` |
 
 Trên bộ mới tạo, có thể đăng nhập `demo05` / `Demo_123!`, cập nhật và xác minh email thật, sau đó tra `SV20261007` để thử khoản học phí 1 triệu đồng.
+
+### Chạy trên macOS
+
+Các script `.ps1` chạy được trên macOS bằng PowerShell 7 (`pwsh`), bản PowerShell đa nền tảng của Microsoft. Mọi tham số như `-Check`, `-Detached`, `-PrepareDemo`, `-SeedDemo`, `-Rebuild` giữ nguyên; chỉ thay phần đầu lệnh `powershell -ExecutionPolicy Bypass -File .\start.ps1` bằng `pwsh ./start.ps1`.
+
+1. Cài và mở **Docker Desktop for Mac**. Với máy chip Apple (M1 trở lên), vào **Settings → General** và bật **Use Rosetta for x86_64/amd64 emulation on Apple Silicon**, vì image SQL Server chỉ có bản amd64.
+2. Cài PowerShell 7 bằng Homebrew:
+
+   ```bash
+   brew install --cask powershell
+   ```
+
+3. Mở Terminal tại thư mục dự án, tạo file cấu hình rồi điền giá trị như [Bước 2](#bước-2--chuẩn-bị-cấu-hình-docker):
+
+   ```bash
+   cp infra/env/docker.env.example infra/env/docker.env
+   open -e infra/env/docker.env
+   ```
+
+   Có thể tạo chuỗi ngẫu nhiên cho `JWT_SECRET_KEY` và `INTERNAL_API_KEY` bằng lệnh `openssl rand -hex 32` (chạy hai lần, mỗi khóa một giá trị khác nhau).
+
+4. Kiểm tra cấu hình:
+
+   ```bash
+   pwsh ./start.ps1 -Check
+   ```
+
+5. Khởi động và tạo dữ liệu demo:
+
+   ```bash
+   pwsh ./start.ps1 -PrepareDemo -Detached
+   ```
+
+| Việc cần làm | Windows | macOS |
+|---|---|---|
+| Khởi động chạy nền | `powershell -ExecutionPolicy Bypass -File .\start.ps1 -Detached` | `pwsh ./start.ps1 -Detached` |
+| Quản trị dữ liệu | `powershell -ExecutionPolicy Bypass -File .\demo-data.ps1 -Reset` | `pwsh ./demo-data.ps1 -Reset` |
+| Dừng ứng dụng | `docker compose --env-file infra/env/docker.env stop` | Giống Windows |
+| Xem database | SSMS, server `127.0.0.1,14330` | VS Code (tiện ích mssql) hoặc DBeaver, server `127.0.0.1`, cổng `14330` |
+
+Nếu bước build image báo lỗi khi cài `msodbcsql18` trên máy chip Apple, build lại toàn bộ ở dạng amd64 qua Rosetta:
+
+```bash
+DOCKER_DEFAULT_PLATFORM=linux/amd64 pwsh ./start.ps1 -Rebuild -Detached
+```
 
 ## 3. Khởi động lại, xem log và dừng
 
